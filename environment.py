@@ -35,8 +35,8 @@ Water tank loses heat over time (U = 2.0)
 class WaterHeaterEnv(gym.Env):
     metadata = {
         "render_modes": [
-        "human",
-        "rgb_array"
+            "human",
+            "rgb_array"
         ],
         "render_fps": 5
     }
@@ -68,8 +68,7 @@ class WaterHeaterEnv(gym.Env):
             {
                 "day": gym.spaces.Discrete(1),
                 "time": gym.spaces.Discrete(1),
-                "waterTemperature": gym.spaces.Box(0.0, 100.0, (1,)),
-                "electricityPrice": gym.spaces.Box(0.0, 1000.0, (1,))
+                "waterTemperature": gym.spaces.Box(0.0, 100.0, (1,))
             }
         )
 
@@ -91,10 +90,9 @@ class WaterHeaterEnv(gym.Env):
         A dictionary containing the current observation.
         """
         return {
-        "day": self.day,
-        "time": self.time,
-        "waterTemperature": np.array(self.water_tank_temp).astype(np.float32),
-        "electricityPrice": np.array(self.price_forecast).astype(np.float32)
+            "day": self.day,
+            "time": self.time,
+            "waterTemperature": np.array(self.water_tank_temp).astype(np.float32)
         }
 
 
@@ -107,12 +105,12 @@ class WaterHeaterEnv(gym.Env):
         A dictionary containing additional information.
         """
         return {
-        "rewards": {
-            "comfort": self.reward_vector[0],
-            "hygiene": self.reward_vector[1],
-            "energy": self.reward_vector[2],
-            "safety": self.reward_vector[3]
-        }
+            "rewards": {
+                "comfort": self.reward_vector[0],
+                "hygiene": self.reward_vector[1],
+                "energy": self.reward_vector[2],
+                "safety": self.reward_vector[3]
+            }
         }
     
 

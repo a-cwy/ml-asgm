@@ -20,9 +20,10 @@ hygiene = False
 
 # Rule-based agent to meet basic needs. Maximum (365 * 96) iterations per episode.
 for i in range(365 * 96):
-    if i % 96 == 0: hygiene = True
+    if i % 96 == 0: hygiene = True # Cycle to 70 every day to prevent hygiene punishemnt. 
     if next_obs["waterTemperature"] > 70: hygiene = False
 
+    # Keep temperature around 64C
     if next_obs["waterTemperature"] < 64 or hygiene:
         next_obs, reward, terminated, truncated, info = env.step(1)
     else:
