@@ -2,6 +2,13 @@ from environment import WaterHeaterEnv
 import gymnasium as gym
 
 def init():
+    """
+    Initializes project space.
+    Registers environment into gymnasium to be accessed using gym.make()
+
+    Returns:
+        None
+    """
     gym.register(
         id = "WaterHeater-v0",
         entry_point = WaterHeaterEnv,
