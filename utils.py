@@ -12,7 +12,7 @@ def init():
     gym.register(
         id = "WaterHeater-v0",
         entry_point = WaterHeaterEnv,
-        max_episode_steps = 365 * 96
+        max_episode_steps = 12 * 7 * 96
     )
 
 def format_rewards(reward_breakdown):

@@ -25,11 +25,11 @@ for i in range(365 * 96):
 
     # Keep temperature around 64C
     if next_obs["waterTemperature"] < 64 or hygiene:
-        next_obs, reward, terminated, truncated, info = env.step(1)
+        next_obs, reward, terminated, truncated, info = env.step(3)
     else:
         next_obs, reward, terminated, truncated, info = env.step(0)
 
-    total_reward += reward
+    total_reward += np.float32(reward)
 
     # Cumulative reward for each subcategory.
     reward_breakdown[0] += info["rewards"]["comfort"]
@@ -43,3 +43,5 @@ for i in range(365 * 96):
 
 # Utility function to print a breakdown of the rewards.
 print(utils.format_rewards(reward_breakdown))
+print(next_obs)
+print(info)

@@ -11,7 +11,7 @@ Water heater is rated at 3kW/h
 Water tank is of a rectangular prism with volume of 300L (200cm x 150cm x 100cm)
   Specific heat capacity of water is 4.184J/g/C
   300L = 300kg = 300000g
-  One time step increases temperature by 2700000/300000/4.184 ~ 2.15C
+  1kW per time step increases temperature by 2700000/300000/4.1843 ~ 0.7169658007C
 
 Water tank loses heat over time (U = 2.0)
   Overall heat energy loss in a time step will be q(W) = U(W/m2/K) x A(m2) x deltaT(K)
@@ -45,16 +45,16 @@ class WaterHeaterEnv(gym.Env):
         # Environment variables
         self.MAX_DAYS = 365
         self.ROOM_TEMP = 26.4
-        self.OVERHEAT_TEMP = 70
-        self.ELECTRICIY_PER_USE = 0.75
-        self.HEAT_TRANSFER_COEF = 2
+        self.STERILIZATIOJN_TEMP = 70
+        self.ELECTRICIY_PER_USE = [0, 0.25, 0.50, 0.75]
+        self.HEAT_TRANSFER_COEF = 2.0
 
         # self.USER_SCHEDULE = TODO
 
         self.total_days = 0
         self.day = 0
         self.time = 0
-        self.time_since_overheat = 0
+        self.time_since_sterilization = 0
         self.water_tank_temp = 26.4
         self.target_low = 45.0
         self.target_high = 65.0
@@ -68,7 +68,9 @@ class WaterHeaterEnv(gym.Env):
             {
                 "day": gym.spaces.Discrete(1),
                 "time": gym.spaces.Discrete(1),
-                "waterTemperature": gym.spaces.Box(0.0, 100.0, (1,))
+                "waterTemperature": gym.spaces.Box(0.0, 100.0, (1,)),
+                "targetTemperature": gym.spaces.Box(0.0, 100.0, (2,)),
+                "timeSinceSterilization": gym.spaces.Discrete(1)
             }
         )
 
@@ -92,7 +94,9 @@ class WaterHeaterEnv(gym.Env):
         return {
             "day": self.day,
             "time": self.time,
-            "waterTemperature": np.array(self.water_tank_temp).astype(np.float32)
+            "waterTemperature": np.array(self.water_tank_temp).astype(np.float32),
+            "targetTemperature": np.array([self.target_low, self.target_high]).astype(np.float32),
+            "timeSinceSterilization": self.time_since_sterilization
         }
 
 
@@ -115,7 +119,7 @@ class WaterHeaterEnv(gym.Env):
     
 
 
-    def _calculate_reward(self, weights = [1.0, 1.0, 1.0, 1.0]):
+    def _calculate_reward(self, action, weights = [1.0, 1.0, 1.0, 1.0]):
         """
         Calculate the rewards for this current timestep
         
@@ -123,8 +127,8 @@ class WaterHeaterEnv(gym.Env):
         Tuple of each reward type
         """
         comfort = -weights[0] * (self.target_low - self.water_tank_temp) if self.isUsing else 0.0
-        hygiene = -weights[1] * max(self.time_since_overheat - 96.0, 0.0)
-        energy = -weights[2] * self.ELECTRICIY_PER_USE 
+        hygiene = -weights[1] * max(self.time_since_sterilization - 96.0, 0.0)
+        energy = -weights[2] * self.ELECTRICIY_PER_USE[action] 
         safety = -weights[3] * pow(self.water_tank_temp - self.target_high + 1, 2) if self.isUsing and self.water_tank_temp > self.target_high else 0.0
         reward_vector = (comfort, hygiene, energy, safety)
 
@@ -134,7 +138,7 @@ class WaterHeaterEnv(gym.Env):
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         """
-        Resets the simulation to start a new episode.
+        Resets the simulation to start a newpisode.
         Starting temperature for the water tank is randomized to the range (20, 30).
 
         Returns:
@@ -145,7 +149,7 @@ class WaterHeaterEnv(gym.Env):
         self.total_days = 0
         self.day = 0
         self.time = 0
-        self.time_since_overheat = 0
+        self.time_since_sterilization = 0
         self.water_tank_temp = (np.random.random() * 10) + 20
         self.target_low = 45.0
         self.target_high = 65.0
@@ -175,7 +179,7 @@ class WaterHeaterEnv(gym.Env):
                         1: episode has exceeded max timesteps
         info          - additial information about the current timestep
         """
-        assert action == 1 or action == 0, "Action must be discrete integer 0 or 1."
+        assert action in [0, 1, 2, 3], "Action must be discrete integer betwwen 0 and 3 (inclusive)."
 
         # Perform action
         self.elementIsActive = bool(action)
@@ -197,19 +201,19 @@ class WaterHeaterEnv(gym.Env):
         self.water_tank_temp -= temp_loss
         
         if self.elementIsActive:
-            self.water_tank_temp = min(self.water_tank_temp + 2.15, 100.0)
+            self.water_tank_temp = min(self.water_tank_temp + (0.7169658007 * action), 100.0)
 
         # Update cycle for overheat time tracker
-        if self.water_tank_temp >= 70:
-            self.time_since_overheat = 0
+        if self.water_tank_temp >= self.STERILIZATIOJN_TEMP:
+            self.time_since_sterilization = 0
         else:
-            self.time_since_overheat += 1
+            self.time_since_sterilization += 1
 
         # Update isUsing
         self.isUsing = np.random.choice([True, False])
 
         # Calculate reward
-        self.reward_vector = self._calculate_reward()
+        self.reward_vector = self._calculate_reward(action)
 
         observation = self._get_obs()
         reward = sum(self.reward_vector)
