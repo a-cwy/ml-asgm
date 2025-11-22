@@ -69,7 +69,8 @@ class WaterHeaterEnv(gym.Env):
                 "day": gym.spaces.Discrete(1),
                 "time": gym.spaces.Discrete(1),
                 "waterTemperature": gym.spaces.Box(0.0, 100.0, (1,)),
-                "targetTemperature": gym.spaces.Box(0.0, 100.0, (2,)),
+                "targetTemperatureLow": gym.spaces.Box(0.0, 100.0, (1,)),
+                "targetTemperatureHigh": gym.spaces.Box(0.0, 100.0, (1,)),
                 "timeSinceSterilization": gym.spaces.Discrete(1)
             }
         )
@@ -95,7 +96,8 @@ class WaterHeaterEnv(gym.Env):
             "day": self.day,
             "time": self.time,
             "waterTemperature": np.array(self.water_tank_temp).astype(np.float32),
-            "targetTemperature": np.array([self.target_low, self.target_high]).astype(np.float32),
+            "targetTemperatureLow": np.array(self.target_low).astype(np.float32),
+            "targetTemperatureHigh": np.array(self.target_high).astype(np.float32),
             "timeSinceSterilization": self.time_since_sterilization
         }
 
@@ -210,7 +212,7 @@ class WaterHeaterEnv(gym.Env):
             self.time_since_sterilization += 1
 
         # Update isUsing
-        self.isUsing = np.random.choice([True, False])
+        self.isUsing = 1 if self.time % 4 == 0 else 0
 
         # Calculate reward
         self.reward_vector = self._calculate_reward(action)
