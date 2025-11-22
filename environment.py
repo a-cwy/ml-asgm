@@ -8,12 +8,12 @@ ASSUMPTIONS - IMPORTANT
 Water heater is rated at 3kW/h
   This translates to a total use of 2700000J of energy per time step(15 minutes)
 
-Water tank is of a rectangular prism with volume of 300L (200cm x 150cm x 100cm)
+Water tank is of a rectangular prism with volume of 300L (100cm x 100cm x 30cm)
   Specific heat capacity of water is 4.184J/g/C
   300L = 300kg = 300000g
   1kW per time step increases temperature by 2700000/300000/4.1843 ~ 0.7169658007C
 
-Water tank loses heat over time (U = 2.0)
+Water tank loses heat over time (ex. U = 2.0)
   Overall heat energy loss in a time step will be q(W) = U(W/m2/K) x A(m2) x deltaT(K)
   Surface area of tank = 13m2
   q = 2 x 13 x (CUR_TEMP - ROOM_TEMP)
@@ -42,7 +42,7 @@ class WaterHeaterEnv(gym.Env):
     }
 
     def __init__(self, render_mode = None):
-        # Environment variables
+        # Variables & constants
         self.MAX_DAYS = 365
         self.ROOM_TEMP = 26.4
         self.STERILIZATIOJN_TEMP = 70
@@ -60,6 +60,8 @@ class WaterHeaterEnv(gym.Env):
         self.target_high = 65.0
         self.isUsing = False
         self.elementIsActive = False
+
+        self.temp_loss = 0.0
         
         self.reward_vector = [0.0, 0.0, 0.0, 0.0] # Comfort, Hygiene, Energy, Safety
 
@@ -116,7 +118,8 @@ class WaterHeaterEnv(gym.Env):
                 "hygiene": self.reward_vector[1],
                 "energy": self.reward_vector[2],
                 "safety": self.reward_vector[3]
-            }
+            },
+            "heat_loss": self.temp_loss
         }
     
 
@@ -199,8 +202,8 @@ class WaterHeaterEnv(gym.Env):
             self.time += 1
 
         # Update cycle for water temperature
-        temp_loss = (self.water_tank_temp - self.ROOM_TEMP) * self.HEAT_TRANSFER_COEF * 0.009321
-        self.water_tank_temp -= temp_loss
+        self.temp_loss = (self.water_tank_temp - self.ROOM_TEMP) * self.HEAT_TRANSFER_COEF * 0.009321
+        self.water_tank_temp -= self.temp_loss
         
         if self.elementIsActive:
             self.water_tank_temp = min(self.water_tank_temp + (0.7169658007 * action), 100.0)

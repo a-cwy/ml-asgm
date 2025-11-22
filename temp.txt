@@ -1,0 +1,24 @@
+> Soft Actor-Critic (SAC)
+- "agent is incentivized to succeed at the task while also acting as randomly as possible"
+- https://arxiv.org/pdf/1812.05905
+
+> (Asynchronous) Advantage Actor-Critic (A2C/A3C, same thing just diff implementation)
+- multiple agents train in parallel to update global model
+- https://arxiv.org/pdf/1602.01783
+
+> Proximal Policy Optimization (PPO)
+- clipping rule to limit how large policy changes can be
+- https://arxiv.org/pdf/1707.06347
+
+> Phasic Policy Gradient (PPG)
+- extension of PPO, seperately optimizes policy and value function
+- https://arxiv.org/pdf/2009.04416
+
+> Deep Q-Learning (DQN)
+- uses a deep neural network to approximate Q function
+- https://arxiv.org/pdf/1312.5602
+
+> Actor-Critic with Experience Replay (ACER)
+- uses a deep neural net to estimate policy and value functions
+- reuses past experiences
+- https://arxiv.org/pdf/1611.01224
