@@ -68,8 +68,8 @@ class WaterHeaterEnv(gym.Env):
         # Initialize observation space
         self.observation_space = gym.spaces.Dict(
             {
-                "day": gym.spaces.Discrete(1),
-                "time": gym.spaces.Discrete(1),
+                "day": gym.spaces.Discrete(7),
+                "time": gym.spaces.Discrete(96),
                 "waterTemperature": gym.spaces.Box(0.0, 100.0, (1,)),
                 "targetTemperatureLow": gym.spaces.Box(0.0, 100.0, (1,)),
                 "targetTemperatureHigh": gym.spaces.Box(0.0, 100.0, (1,)),
@@ -78,7 +78,7 @@ class WaterHeaterEnv(gym.Env):
         )
 
         # Initialize action space
-        self.action_space = gym.spaces.Discrete(1)
+        self.action_space = gym.spaces.Discrete(4)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
