@@ -113,6 +113,6 @@ class DQNAgent():
 import utils
 utils.init()
 env = gym.make("WaterHeater-v0")
-agent = DQNAgent(env, 6, 4)
+agent = DQNAgent(env, 5, 4)
 rewards = agent.train(10)
 print(rewards)

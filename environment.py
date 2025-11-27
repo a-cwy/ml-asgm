@@ -48,6 +48,8 @@ class WaterHeaterEnv(gym.Env):
         self.STERILIZATIOJN_TEMP = 70
         self.ELECTRICIY_PER_USE = [0, 0.25, 0.50, 0.75]
         self.HEAT_TRANSFER_COEF = 2.0
+        self.USER_TEMP_PREFERENCE = 45.0
+        self.MAX_PERMISSIBLE_TEMP = 90.0
 
         # self.USER_SCHEDULE = TODO
 
@@ -56,8 +58,7 @@ class WaterHeaterEnv(gym.Env):
         self.time = 0
         self.time_since_sterilization = 0
         self.water_tank_temp = 26.4
-        self.target_low = 45.0
-        self.target_high = 65.0
+        self.target_temp = self.USER_TEMP_PREFERENCE
         self.isUsing = False
         self.elementIsActive = False
 
@@ -71,8 +72,7 @@ class WaterHeaterEnv(gym.Env):
                 "day": gym.spaces.Discrete(7),
                 "time": gym.spaces.Discrete(96),
                 "waterTemperature": gym.spaces.Box(0.0, 100.0, (1,)),
-                "targetTemperatureLow": gym.spaces.Box(0.0, 100.0, (1,)),
-                "targetTemperatureHigh": gym.spaces.Box(0.0, 100.0, (1,)),
+                "targetTemperature": gym.spaces.Box(0.0, 100.0, (1,)),
                 "timeSinceSterilization": gym.spaces.Discrete(1)
             }
         )
@@ -98,8 +98,7 @@ class WaterHeaterEnv(gym.Env):
             "day": self.day,
             "time": self.time,
             "waterTemperature": np.array(self.water_tank_temp).astype(np.float32),
-            "targetTemperatureLow": np.array(self.target_low).astype(np.float32),
-            "targetTemperatureHigh": np.array(self.target_high).astype(np.float32),
+            "targetTemperature": np.array(self.target_temp).astype(np.float32),
             "timeSinceSterilization": self.time_since_sterilization
         }
 
@@ -124,17 +123,17 @@ class WaterHeaterEnv(gym.Env):
     
 
 
-    def _calculate_reward(self, action, weights = [1.0, 1.0, 1.0, 1.0]):
+    def _calculate_reward(self, action, weights = [5.0, 1.0, 1.0, 1.0]):
         """
         Calculate the rewards for this current timestep
         
         Returns:
         Tuple of each reward type
         """
-        comfort = -weights[0] * (self.target_low - self.water_tank_temp) if self.isUsing else 0.0
+        comfort = weights[0] * min(self.water_tank_temp - self.target_temp, 1.0) if self.isUsing else 0.0
         hygiene = -weights[1] * max(self.time_since_sterilization - 96.0, 0.0)
         energy = -weights[2] * self.ELECTRICIY_PER_USE[action] 
-        safety = -weights[3] * pow(self.water_tank_temp - self.target_high + 1, 2) if self.isUsing and self.water_tank_temp > self.target_high else 0.0
+        safety = -weights[3] * pow(self.water_tank_temp - self.MAX_PERMISSIBLE_TEMP + 1, 2) if self.isUsing and self.water_tank_temp > self.MAX_PERMISSIBLE_TEMP else 0.0
         reward_vector = (comfort, hygiene, energy, safety)
 
         return reward_vector
