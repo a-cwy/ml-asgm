@@ -49,6 +49,7 @@ class DQNAgent():
         model = keras.Sequential()
         model.add(keras.layers.Input((input_size,)))
         model.add(keras.layers.Dense(16, activation = "relu"))
+        model.add(keras.layers.Dense(8, activation = "relu"))
         model.add(keras.layers.Dense(output_size, activation = "linear"))
         model.compile(loss = 'mse', optimizer = keras.optimizers.Adam(learning_rate = self.learning_rate))
 
@@ -86,7 +87,7 @@ class DQNAgent():
             truncated = False
 
             while (not terminated and not truncated):
-                if np.random.random() > self.epsilon:
+                if np.random.random() < self.epsilon:
                     action = self.env.action_space.sample()
                 else:
                     action = self.policy_network.predict(self._flatten_obs(obs), verbose = 0)[0].argmax()
@@ -136,9 +137,9 @@ class DQNAgent():
 
 ###########################################################
 
-LOAD_PRETRAINED = False
-VERSION_NUM = "v1-0-1"
-EPISODES_NUM = 500
+LOAD_PRETRAINED = True
+VERSION_NUM = "v4-0-0"
+EPISODES_NUM = 100
 POLICY_DIR = f"./models/dqn/dqn-{VERSION_NUM}-e{EPISODES_NUM}-policy.keras"
 TARGET_DIR = f"./models/dqn/dqn-{VERSION_NUM}-e{EPISODES_NUM}-target.keras"
 

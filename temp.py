@@ -1,36 +1,31 @@
 import utils
-import gymnasium as gym
-import numpy as np
-import random
-from dqn import DQNAgent
 
-utils.init()
+rewards = [
+    539.37078651,-3481.63863318,-3639.25973046,-2745.69394765,
+    -374.81397261,-1104.12377086,-4041.55744872,-6040.94734777,
+    -9453.85118032,-2177.62476291,-900.60743569,-2406.21102496,
+    928.5,939.,650.,915.25,
+    570.82786021,551.03056535,570.15384196,932.5,
+    732.11328902,211.9664788,929.75,752.21994982,
+    933.5,923.,367.91656733,-1280.15619659,
+    -1310.70555837,-2379.87262609,-2180.13565058,-4194.93367662,
+    -9194.33190726,722.89705036,178.13276659,921.25,
+    909.5,900.,899.,739.59907052,
+    -343.13598943,-904.8877411,917.5,928.,
+    922.25,924.5,915.25,943.25,
+    457.5,675.75,923.25,934.75,
+    936.5,928.25,-508.25,914.,
+    720.75,942.5,808.75,-2805.40354206,
+    -14118.21196109,-8772.96495772,-22897.85332788,176.02520818,
+    -555.41101977,-22657.39489829,937.75,940.5,
+    944.,955.5,962.75,949.25,
+    954.,968.5,818.5,974.5,
+    643.75,777.25,986.75,979.25,
+    987.5,971.25,724.25,685.25,
+    -363.75,997.75,-1937.5,997.75,
+    -3083.5,959.25,957.,961.,
+    978.5,973.,964.5,948.,
+    977.5,988.,938.,925.5
+]
 
-env = gym.make("WaterHeater-v0")
-agent = DQNAgent(env, state_size = 6, action_size = 4)
-
-EPISODES = 100
-                 
-for e in range(EPISODES):
-    obs, info = agent.env.reset()
-    total_reward = 0.0
-
-    for i in range(2000):
-        action = agent.act(np.array(list(obs.values())).reshape(-1, 6))
-        next_obs, reward, terminated, truncated, info = agent.env.step(action)
-        agent.remember(
-            np.array(list(obs.values())).reshape(-1, 6), 
-            action, 
-            reward, 
-            np.array(list(next_obs.values())).reshape(-1, 6), 
-            terminated or truncated
-        )
-        total_reward += reward # type: ignore
-        obs = next_obs
-
-    if len(agent.memory) > 128:
-        agent.replay(batch_size = 128)
-
-    print(f"Episode: {e+1}")
-    print(f"Reward: {total_reward:.2f}")
-    print(f"Epsilon: {agent.epsilon:.5f}\n")
+utils.plot_rewards(rewards)
