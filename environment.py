@@ -32,6 +32,7 @@ Water tank loses heat over time (ex. U = 2.0)
 
 
 
+
 class WaterHeaterEnv(gym.Env):
     metadata = {
         "render_modes": [
@@ -51,7 +52,32 @@ class WaterHeaterEnv(gym.Env):
         self.USER_TEMP_PREFERENCE = 45.0
         self.MAX_PERMISSIBLE_TEMP = 90.0
 
-        # self.USER_SCHEDULE = TODO
+        self.USER_SCHEDULE = [
+            0, 0, 0, 0,     #24
+            0, 0, 0, 0,     #1
+            0, 0, 0, 0,     #2
+            0, 0, 0, 0,     #3
+            0, 0, 0, 0,     #4
+            0, 0, 0, 0,     #5
+            0, 0, 0, 0,     #6
+            0, 0, 0, 0,     #7
+            1, 1, 1, 1,     #8
+            1, 1, 1, 1,     #9
+            1, 1, 0, 0,     #10
+            0, 0, 0, 0,     #11
+            0, 0, 0, 0,     #12
+            0, 0, 1, 1,     #13
+            0, 0, 0, 0,     #14
+            0, 0, 0, 0,     #15
+            0, 0, 0, 0,     #16
+            0, 0, 0, 0,     #17
+            0, 0, 0, 0,     #18
+            0, 0, 0, 0,     #19
+            1, 1, 1, 1,     #20
+            1, 1, 1, 1,     #21
+            0, 0, 0, 0,     #22
+            0, 0, 0, 0,     #23
+        ]
 
         self.total_days = 0
         self.day = 0
@@ -123,7 +149,7 @@ class WaterHeaterEnv(gym.Env):
     
 
 
-    def _calculate_reward(self, action, weights = [5.0, 1.0, 1.0, 1.0]):
+    def _calculate_reward(self, action, weights = [2.0, 1.0, 1.0, 1.0]):
         """
         Calculate the rewards for this current timestep
         
@@ -133,7 +159,7 @@ class WaterHeaterEnv(gym.Env):
         comfort = weights[0] * min(self.water_tank_temp - self.target_temp, 1.0) if self.isUsing else 0.0
         hygiene = -weights[1] * max(self.time_since_sterilization - 96.0, 0.0)
         energy = -weights[2] * self.ELECTRICIY_PER_USE[action] 
-        safety = -weights[3] * pow(self.water_tank_temp - self.MAX_PERMISSIBLE_TEMP + 1, 2) if self.isUsing and self.water_tank_temp > self.MAX_PERMISSIBLE_TEMP else 0.0
+        safety = -weights[3] * self.water_tank_temp - self.MAX_PERMISSIBLE_TEMP if self.isUsing and self.water_tank_temp > self.MAX_PERMISSIBLE_TEMP else 0.0
         reward_vector = (comfort, hygiene, energy, safety)
 
         return reward_vector
@@ -155,8 +181,7 @@ class WaterHeaterEnv(gym.Env):
         self.time = 0
         self.time_since_sterilization = 0
         self.water_tank_temp = (np.random.random() * 10) + 20
-        self.target_low = 45.0
-        self.target_high = 65.0
+        self.target_temp = self.USER_TEMP_PREFERENCE
         self.isUsing = False
         self.elementIsActive = False
         self.price_forecast = 0.0
@@ -188,6 +213,9 @@ class WaterHeaterEnv(gym.Env):
         # Perform action
         self.elementIsActive = bool(action)
 
+        # Update isUsing
+        self.isUsing = bool(self.USER_SCHEDULE[self.time - 1])
+
         # Update cycle for day and time
         if self.time == 96:
             self.time = 1
@@ -213,8 +241,6 @@ class WaterHeaterEnv(gym.Env):
         else:
             self.time_since_sterilization += 1
 
-        # Update isUsing
-        self.isUsing = 1 if self.time % 4 == 0 else 0
 
         # Calculate reward
         self.reward_vector = self._calculate_reward(action)

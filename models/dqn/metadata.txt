@@ -1,0 +1,11 @@
+model v1-0-0
+
+nn = 6, 16, 16, 4
+
+learning_rate = 0.0005, 
+epsilon = 1,
+min_epsilon = 0.01,
+epsilon_decay = 0.995,
+discount_factor = 0.9,
+mini_batch_size = 64,
+replay_memory_size = 1500 
