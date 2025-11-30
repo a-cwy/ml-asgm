@@ -9,10 +9,10 @@ utils.init()
 # Initializing the environment and running a reset to randomize starting state.
 env = gym.make("WaterHeater-v0")
 
-EPISODES = 100
+EPISODES = 1000
 reward_list = []
 reward_breakdown = [0.0, 0.0, 0.0, 0.0]
-# Rule-based agent to meet basic needs. Maximum (365 * 96) iterations per episode.
+# Rule-based agent to meet basic needs.
 for e in range(EPISODES):
     obs, _ = env.reset()
     hygiene = False
@@ -45,5 +45,5 @@ for e in range(EPISODES):
     reward_list.append(total_episode_reward)
 
 # Utility function to print a breakdown of the rewards.
-reward_breakdown = np.divide(reward_breakdown, 100)
+reward_breakdown = np.divide(reward_breakdown, EPISODES)
 print(utils.format_rewards(reward_breakdown))
