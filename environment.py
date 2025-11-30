@@ -87,6 +87,7 @@ class WaterHeaterEnv(gym.Env):
         self.target_temp = self.USER_TEMP_PREFERENCE
         self.isUsing = False
         self.elementIsActive = False
+        self.forecast = False
 
         self.temp_loss = 0.0
         
@@ -99,7 +100,8 @@ class WaterHeaterEnv(gym.Env):
                 "time": gym.spaces.Discrete(96),
                 "waterTemperature": gym.spaces.Box(0.0, 100.0, (1,)),
                 "targetTemperature": gym.spaces.Box(0.0, 100.0, (1,)),
-                "timeSinceSterilization": gym.spaces.Discrete(1)
+                "timeSinceSterilization": gym.spaces.Discrete(1),
+                "forecast": gym.spaces.Discrete(2)
             }
         )
 
@@ -125,7 +127,8 @@ class WaterHeaterEnv(gym.Env):
             "time": self.time,
             "waterTemperature": np.array(self.water_tank_temp).astype(np.float32),
             "targetTemperature": np.array(self.target_temp).astype(np.float32),
-            "timeSinceSterilization": self.time_since_sterilization
+            "timeSinceSterilization": self.time_since_sterilization,
+            "forecast": int(self.forecast)
         }
 
 
@@ -149,7 +152,7 @@ class WaterHeaterEnv(gym.Env):
     
 
 
-    def _calculate_reward(self, action, weights = [2.0, 1.0, 1.0, 1.0]):
+    def _calculate_reward(self, action, weights = [5.0, 1.0, 1.0, 1.0]):
         """
         Calculate the rewards for this current timestep
         
@@ -184,7 +187,7 @@ class WaterHeaterEnv(gym.Env):
         self.target_temp = self.USER_TEMP_PREFERENCE
         self.isUsing = False
         self.elementIsActive = False
-        self.price_forecast = 0.0
+        self.forecast = False
 
         observation = self._get_obs()
         info = self._get_info()
@@ -240,6 +243,9 @@ class WaterHeaterEnv(gym.Env):
             self.time_since_sterilization = 0
         else:
             self.time_since_sterilization += 1
+
+        # Update cycle for forecast
+        self.forecast = bool(self.USER_SCHEDULE[(self.time + 1) % 96])
 
 
         # Calculate reward
