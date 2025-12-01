@@ -240,7 +240,7 @@ class A2CAgent():
 #### TRAINING CONFIG
 from datetime import datetime
 LOAD_PRETRAINED = False
-# USE_DATESTAMP = True
+USE_DATESTAMP = True
 
 # Get the current date and time
 now = datetime.now()
