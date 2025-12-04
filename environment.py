@@ -160,7 +160,7 @@ class WaterHeaterEnv(gym.Env):
         Tuple of each reward type
         """
         comfort = weights[0] * min(self.water_tank_temp - self.target_temp, 1.0) if self.isUsing else 0.0
-        hygiene = -weights[1] * min(self.time_since_sterilization - 96.0, 1.0)
+        hygiene = -weights[1] * (1.0 if self.time_since_sterilization >= 96 else 0.0)
         energy = -weights[2] * self.ELECTRICIY_PER_USE[action] 
         safety = -weights[3] * self.water_tank_temp - self.MAX_PERMISSIBLE_TEMP if self.isUsing and self.water_tank_temp > self.MAX_PERMISSIBLE_TEMP else 0.0
         reward_vector = (comfort, hygiene, energy, safety)
