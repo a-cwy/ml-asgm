@@ -78,6 +78,8 @@ class A2CAgent():
 
         # Device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Using device: {self.device}")
+
         self.actor_model.to(self.device)
         self.critic_model.to(self.device)
 
@@ -104,32 +106,125 @@ class A2CAgent():
 
     def act(self):
         """Run one episode using the current policy (deterministic argmax)."""
+        #breakdown rewards
         obs, _ = self.env.reset()
         state = self._flatten_obs(obs)
-        done = False
+        terminated = False
+        truncated = False
         total_reward = 0.0
-        while True:
+        while (not terminated and not truncated):
             state_t = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             with torch.no_grad():
                 probs = self.actor_model(state_t)
                 action = probs.argmax(dim=-1).item()
+
             next_obs, reward, terminated, truncated, info = self.env.step(action)
             total_reward += reward
             state = self._flatten_obs(next_obs)
-            if terminated or truncated:
-                break
-        print(f"Episode total reward: {total_reward}")
+            rewards_breakdown = np.add(np.zeros(len(info["rewards"])), list(info["rewards"].values()))
+            # if terminated or truncated:
+            #     break
+        print(f"ACT: Episode rewards breakdown {utils.format_rewards(rewards_breakdown)}")
 
-    def save_models(self, policy_path, value_path):
-        os.makedirs(os.path.dirname(policy_path), exist_ok=True)
-        torch.save(self.actor_model.state_dict(), policy_path)
-        torch.save(self.critic_model.state_dict(), value_path)
+    def save_models(self, actor_path, critic_path):
+        """
+        Save actor and critic state_dicts to the given paths. Also saves an
+        optional combined checkpoint including optimizer states and epoch when
+        called with `save_checkpoint=True` (uses the agent's optimizers by
+        default).
+        """
+        os.makedirs(os.path.dirname(actor_path) or '.', exist_ok=True)
+        os.makedirs(os.path.dirname(critic_path) or '.', exist_ok=True)
+        torch.save(self.actor_model.state_dict(), actor_path)
+        torch.save(self.critic_model.state_dict(), critic_path)
+        print(f"Saved actor model to {actor_path}")
+        print(f"Saved critic model to {critic_path}")
 
-    def load_models(self, policy_path, value_path, map_location=None):
+    def save_checkpoint(self, actor_path, critic_path, checkpoint_path=None, epoch=None, optimizer_actor=None, optimizer_critic=None):
+        """
+        Save model weights and (optionally) optimizer states into a single
+        checkpoint file. If `optimizer_actor` / `optimizer_critic` are not
+        provided, the agent's own optimizers are used when available.
+        """
+        # ensure model weights are saved as well
+        self.save_models(actor_path, critic_path)
+
+        if checkpoint_path is None:
+            checkpoint_path = os.path.join(os.path.dirname(actor_path) or '.', 'a2c_checkpoint.pth')
+
+        os.makedirs(os.path.dirname(checkpoint_path) or '.', exist_ok=True)
+
+        if optimizer_actor is None and hasattr(self, 'actor_optimizer'):
+            optimizer_actor = self.actor_optimizer
+        if optimizer_critic is None and hasattr(self, 'critic_optimizer'):
+            optimizer_critic = self.critic_optimizer
+
+        ckpt = {
+            'epoch': epoch,
+            'actor_state_dict': self.actor_model.state_dict(),
+            'critic_state_dict': self.critic_model.state_dict(),
+        }
+
+        if optimizer_actor is not None:
+            ckpt['optimizer_actor'] = optimizer_actor.state_dict()
+        if optimizer_critic is not None:
+            ckpt['optimizer_critic'] = optimizer_critic.state_dict()
+
+        torch.save(ckpt, checkpoint_path)
+        print(f"Saved full checkpoint to {checkpoint_path}")
+
+    def load_models(self, actor_path, critic_path, map_location=None, checkpoint_path=None, load_optimizers: bool = False):
+        """
+        Load actor and critic weights from the provided paths. If `load_optimizers`
+        is True and a `checkpoint_path` exists, the optimizer states will be
+        restored into the agent's optimizers when available. Returns the epoch
+        value stored in the checkpoint (or None).
+        """
         if map_location is None:
             map_location = self.device
-        self.actor_model.load_state_dict(torch.load(policy_path, map_location=map_location))
-        self.critic_model.load_state_dict(torch.load(value_path, map_location=map_location))
+
+        if os.path.exists(actor_path):
+            self.actor_model.load_state_dict(torch.load(actor_path, map_location=map_location))
+            print(f"Loaded actor model from {actor_path}")
+        else:
+            print(f"Warning: actor model path not found: {actor_path}")
+
+        if os.path.exists(critic_path):
+            self.critic_model.load_state_dict(torch.load(critic_path, map_location=map_location))
+            print(f"Loaded critic model from {critic_path}")
+        else:
+            print(f"Warning: critic model path not found: {critic_path}")
+
+        loaded_epoch = None
+        if load_optimizers:
+            if checkpoint_path is None:
+                checkpoint_path = os.path.join(os.path.dirname(actor_path) or '.', 'a2c_checkpoint.pth')
+
+            if os.path.exists(checkpoint_path):
+                ckpt = torch.load(checkpoint_path, map_location=map_location)
+                # restore optimizers if available on agent
+                if hasattr(self, 'actor_optimizer') and 'optimizer_actor' in ckpt:
+                    try:
+                        self.actor_optimizer.load_state_dict(ckpt['optimizer_actor'])
+                    except Exception as e:
+                        print(f"Warning: failed to load actor optimizer state: {e}")
+
+                if hasattr(self, 'critic_optimizer') and 'optimizer_critic' in ckpt:
+                    try:
+                        self.critic_optimizer.load_state_dict(ckpt['optimizer_critic'])
+                    except Exception as e:
+                        print(f"Warning: failed to load critic optimizer state: {e}")
+
+                # refresh model weights from checkpoint if present
+                if 'actor_state_dict' in ckpt:
+                    self.actor_model.load_state_dict(ckpt['actor_state_dict'])
+                if 'critic_state_dict' in ckpt:
+                    self.critic_model.load_state_dict(ckpt['critic_state_dict'])
+
+                loaded_epoch = ckpt.get('epoch', None)
+                print(f"Loaded checkpoint from {checkpoint_path} (epoch={loaded_epoch})")
+
+        return loaded_epoch
 
     def compute_n_step_returns(self, rewards, next_value, masks):
         """Compute discounted n-step returns (list) in reverse order."""
@@ -140,11 +235,15 @@ class A2CAgent():
             returns.insert(0, R)
         return returns
 
-    def train(self, episodes: int, save_every: int = 50, policy_path=None, value_path=None, max_steps_per_episode: int = 2000):
-        """Train the actor-critic using n-step returns."""
+    def train(self, episodes: int, save_every: int = 100, actor_path=None, critic_path=None, max_steps_per_episode: int = 2000):
+        """
+        Train the actor-critic using n-step returns.
+        """
         rewards_per_episode = []
 
+        #for each episode
         for ep in range(episodes):
+            rewards_breakdown = [0, 0, 0, 0]
             obs, _ = self.env.reset()
             state = self._flatten_obs(obs)
             ep_reward = 0.0
@@ -155,6 +254,7 @@ class A2CAgent():
             entropies = []
             masks = []  # 1.0 for not done, 0.0 for done
 
+            #for each step in episode
             for step in range(max_steps_per_episode):
                 state_t = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
 
@@ -166,6 +266,7 @@ class A2CAgent():
                 log_prob = dist.log_prob(action)
                 entropy = dist.entropy()
 
+                # use info 
                 next_obs, reward, terminated, truncated, info = self.env.step(action.item())
                 done = bool(terminated or truncated)
 
@@ -177,6 +278,7 @@ class A2CAgent():
 
                 ep_reward += reward
                 state = self._flatten_obs(next_obs)
+                rewards_breakdown = np.add(rewards_breakdown, list(info["rewards"].values()))
 
                 # if we have enough steps or episode finished, perform update
                 if len(rewards) >= self.n_steps or done:
@@ -224,15 +326,17 @@ class A2CAgent():
 
             rewards_per_episode.append(ep_reward)
 
+            
+            # print breakdown
+            print(f"EPISODE {ep} / {episodes}")
+            print(f"{utils.format_rewards(rewards_breakdown)}")
             if ep % 10 == 0:
                 avg_last_10 = np.mean(rewards_per_episode[-10:])
-                print(f"Episode {ep}/{episodes} - Reward: {ep_reward:.2f} - AvgLast10: {avg_last_10:.2f}")
-            else:
-                print(f"Episode {ep}/{episodes} - Reward: {ep_reward:.2f}")
-
+                print(f"  Avg reward (last 10): {avg_last_10:.2f}")
+            
             # save checkpoint
-            if policy_path and value_path and (ep % save_every == 0):
-                self.save_models(policy_path, value_path)
+            if actor_path and critic_path and (ep % save_every == 0) and (ep > 0):
+                self.save_models(actor_path, critic_path)
 
         return rewards_per_episode
 
@@ -250,10 +354,9 @@ now = datetime.now()
 version = now.strftime("%Y%m%d_%H%M%S") if USE_DATESTAMP else "v1"
 
 VERSION_NUM = f"{version}"
-EPISODES = 100
-POLICY_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{EPISODES}-policy.pth"
-VALUE_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{EPISODES}-value.pth"
-
+EPISODES = 200  #CHANGE THIS TO DESIRED NUMBER OF EPISODES
+ACTOR_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{EPISODES}-actor.pth"
+CRITIC_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{EPISODES}-critic.pth"
 
 if __name__ == "__main__":
     utils.init()
@@ -261,12 +364,16 @@ if __name__ == "__main__":
     agent = A2CAgent(env)
     
     #ENSURE directory EXISTS
-    if LOAD_PRETRAINED and os.path.exists(POLICY_DIR) and os.path.exists(VALUE_DIR):
-        agent.load_models(POLICY_DIR, VALUE_DIR)
+    if LOAD_PRETRAINED and os.path.exists(ACTOR_DIR) and os.path.exists(CRITIC_DIR):
+        agent.load_models(ACTOR_DIR, CRITIC_DIR)
         agent.act()
     else:
-        rewards = agent.train(EPISODES, save_every=50, policy_path=POLICY_DIR, value_path=VALUE_DIR)
-        print(rewards)
-        if not os.path.exists(os.path.dirname(POLICY_DIR)):
-            os.makedirs(os.path.dirname(POLICY_DIR), exist_ok=True)
-        agent.save_models(POLICY_DIR, VALUE_DIR)
+        rewards = agent.train(EPISODES, actor_path=ACTOR_DIR, critic_path=CRITIC_DIR)
+        print(f"Rewards for {EPISODES} episodes: {rewards}")
+        print(type(rewards)) #debug
+        if not os.path.exists(os.path.dirname(ACTOR_DIR)):
+            os.makedirs(os.path.dirname(ACTOR_DIR), exist_ok=True)
+        
+        #Plot re
+        utils.plot_rewards(rewards)
+        agent.save_models(ACTOR_DIR, CRITIC_DIR)
