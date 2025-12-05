@@ -44,12 +44,10 @@ class WaterHeaterEnv(gym.Env):
 
     def __init__(self, render_mode = None):
         # Variables & constants
-        self.MAX_DAYS = 365
         self.ROOM_TEMP = 26.4
-        self.STERILIZATIOJN_TEMP = 70
+        self.STERILIZATION_TEMP = 70
         self.ELECTRICIY_PER_USE = [0, 0.25, 0.50, 0.75]
         self.HEAT_TRANSFER_COEF = 2.0
-        self.USER_TEMP_PREFERENCE = 45.0
         self.MAX_PERMISSIBLE_TEMP = 90.0
 
         self.USER_SCHEDULE = [
@@ -79,18 +77,18 @@ class WaterHeaterEnv(gym.Env):
             0, 0, 0, 0,     #23
         ]
 
-        self.total_days = 0
         self.day = 0
         self.time = 0
         self.time_since_sterilization = 0
         self.water_tank_temp = 26.4
+        self.USER_TEMP_PREFERENCE = 45.0
         self.target_temp = self.USER_TEMP_PREFERENCE
         self.isUsing = False
         self.elementIsActive = False
         self.forecast = False
 
+        # Values for extra info tracking
         self.temp_loss = 0.0
-        
         self.reward_vector = [0.0, 0.0, 0.0, 0.0] # Comfort, Hygiene, Energy, Safety
 
         # Initialize observation space
@@ -179,7 +177,6 @@ class WaterHeaterEnv(gym.Env):
         """
         super().reset(seed=seed)
 
-        self.total_days = 0
         self.day = 0
         self.time = 0
         self.time_since_sterilization = 0
@@ -239,7 +236,7 @@ class WaterHeaterEnv(gym.Env):
             self.water_tank_temp = min(self.water_tank_temp + (0.7169658007 * action), 100.0)
 
         # Update cycle for overheat time tracker
-        if self.water_tank_temp >= self.STERILIZATIOJN_TEMP:
+        if self.water_tank_temp >= self.STERILIZATION_TEMP:
             self.time_since_sterilization = 0
         else:
             self.time_since_sterilization += 1
