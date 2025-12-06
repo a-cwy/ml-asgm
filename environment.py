@@ -77,8 +77,8 @@ class WaterHeaterEnv(gym.Env):
             0, 0, 0, 0,     #23
         ]
 
-        self.day = 0
-        self.time = 0
+        self.day = 1
+        self.time = 1
         self.time_since_sterilization = 0
         self.water_tank_temp = 26.4
         self.USER_TEMP_PREFERENCE = 45.0
@@ -94,14 +94,14 @@ class WaterHeaterEnv(gym.Env):
         # Initialize observation space
         self.observation_space = gym.spaces.Dict(
             {
-                "day": gym.spaces.Discrete(7),
-                "time": gym.spaces.Discrete(96),
+                "day": gym.spaces.Discrete(n = 7, start = 1),
+                "time": gym.spaces.Discrete(n = 96, start = 1),
                 "waterTemperature": gym.spaces.Box(0.0, 100.0, (1,)),
                 "targetTemperature": gym.spaces.Box(0.0, 100.0, (1,)),
-                "timeSinceSterilization": gym.spaces.Discrete(1),
-                "forecast": gym.spaces.Discrete(2)
+                "timeSinceSterilization": gym.spaces.Discrete(1000),
+                "forecast": gym.spaces.Discrete(1)
             }
-        )
+        )   
 
         # Initialize action space
         self.action_space = gym.spaces.Discrete(4)
@@ -152,7 +152,7 @@ class WaterHeaterEnv(gym.Env):
 
     def _calculate_reward(self, action, weights = [5.0, 3.0, 1.0, 1.0]):
         """
-        Calculate the rewards for this current timestep
+         late the rewards for this current timestep
         
         Returns:
         Tuple of each reward type
@@ -177,8 +177,8 @@ class WaterHeaterEnv(gym.Env):
         """
         super().reset(seed=seed)
 
-        self.day = 0
-        self.time = 0
+        self.day = 1
+        self.time = 1
         self.time_since_sterilization = 0
         self.water_tank_temp = (np.random.random() * 10) + 20
         self.target_temp = self.USER_TEMP_PREFERENCE

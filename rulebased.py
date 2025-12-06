@@ -9,7 +9,7 @@ utils.init()
 # Initializing the environment and running a reset to randomize starting state.
 env = gym.make("WaterHeater-v0")
 
-EPISODES = 100
+EPISODES = 1000
 reward_list = []
 reward_breakdown = [0.0, 0.0, 0.0, 0.0]
 # Rule-based agent to meet basic needs.
@@ -39,7 +39,7 @@ for e in range(EPISODES):
         reward_breakdown[3] += info["rewards"]["safety"]
 
         if terminated or truncated:
-            print("Simulation ended.")
+            # print("Simulation ended.")
             break
 
     reward_list.append(total_episode_reward)

@@ -1,5 +1,6 @@
 from environment import WaterHeaterEnv
 import gymnasium as gym
+import matplotlib.pyplot as plt
 
 def init():
     """
@@ -27,8 +28,6 @@ def format_rewards(reward_breakdown):
     return formatted_string
 
 def plot_rewards(rewards_per_episode):
-    import matplotlib.pyplot as plt
-
     plt.plot(rewards_per_episode)
     plt.xlabel("Episode")
     plt.ylabel("Total Reward")
