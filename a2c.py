@@ -1,3 +1,4 @@
+import sys
 import gymnasium as gym
 import gymnasium as gym
 import torch
@@ -183,12 +184,14 @@ class A2CAgent():
         if map_location is None:
             map_location = self.device
 
+        ## Load actor
         if os.path.exists(actor_path):
             self.actor_model.load_state_dict(torch.load(actor_path, map_location=map_location))
             print(f"Loaded actor model from {actor_path}")
         else:
             print(f"Warning: actor model path not found: {actor_path}")
-
+        
+        ## Load critic
         if os.path.exists(critic_path):
             self.critic_model.load_state_dict(torch.load(critic_path, map_location=map_location))
             print(f"Loaded critic model from {critic_path}")
@@ -354,22 +357,34 @@ now = datetime.now()
 version = now.strftime("%Y%m%d_%H%M%S") if USE_DATESTAMP else "v1"
 
 VERSION_NUM = f"{version}"
-EPISODES = 200  #CHANGE THIS TO DESIRED NUMBER OF EPISODES
-ACTOR_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{EPISODES}-actor.pth"
-CRITIC_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{EPISODES}-critic.pth"
+episodes = 500  #CHANGE THIS TO DESIRED NUMBER OF EPISODES
+
+# Define model save paths
+# ACTOR_DIR = f"./models/a2c/a2c-20251204_234342-e200-actor.pth"
+# CRITIC_DIR = f"./models/a2c/a2c-20251204_234342-e200-critic.pth"
+
+ACTOR_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{episodes}-actor.pth"
+CRITIC_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{episodes}-critic.pth"
 
 if __name__ == "__main__":
     utils.init()
     env = gym.make("WaterHeater-v0")
     agent = A2CAgent(env)
+    if len(sys.argv) > 1:
+        try:
+            int(sys.argv[1])
+            episodes = int(sys.argv[1])
+            print(f"Training for {episodes} episodes.")
+        except ValueError:
+            print(f"Invalid number of episodes provided. Using default ({episodes}).")
     
     #ENSURE directory EXISTS
     if LOAD_PRETRAINED and os.path.exists(ACTOR_DIR) and os.path.exists(CRITIC_DIR):
         agent.load_models(ACTOR_DIR, CRITIC_DIR)
         agent.act()
     else:
-        rewards = agent.train(EPISODES, actor_path=ACTOR_DIR, critic_path=CRITIC_DIR)
-        print(f"Rewards for {EPISODES} episodes: {rewards}")
+        rewards = agent.train(episodes, actor_path=ACTOR_DIR, critic_path=CRITIC_DIR)
+        print(f"Rewards for {episodes} episodes: {rewards}")
         print(type(rewards)) #debug
         if not os.path.exists(os.path.dirname(ACTOR_DIR)):
             os.makedirs(os.path.dirname(ACTOR_DIR), exist_ok=True)
