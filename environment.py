@@ -218,8 +218,8 @@ class WaterHeaterEnv(gym.Env):
 
         # Update cycle for day and time
         if self.time == 96:
-            day = (day % 7) + 1
-        time = (time % 96) + 1
+            self.day = (self.day % 7) + 1
+        self.time = (self.time % 96) + 1
 
         # Update cycle for water temperature
         self.temp_loss = (self.water_tank_temp - self.ROOM_TEMP) * self.HEAT_TRANSFER_COEF * 0.009321
