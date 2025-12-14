@@ -6,13 +6,13 @@ class ReplayBuffer():
     def __init__(self, max_size, input_shape, n_actions):
         self.mem_size = max_size
         self.mem_cntr = 0
-        self.state_memory = np.zeros((self.mem_size, *input_shape)) # unpack the tensors
-        self.new_state_memory = np.zeros((self.mem_size, *input_shape))
+        self.state_memory = np.zeros((self.mem_size, *input_shape), dtype=np.float32)
+        self.new_state_memory = np.zeros((self.mem_size, *input_shape), dtype=np.float32)
         
         # For discrete actions we store integers (indices)
         self.action_memory = np.zeros(self.mem_size, dtype=np.int64)
         
-        self.reward_memory = np.zeros(self.mem_size)
+        self.reward_memory = np.zeros(self.mem_size, dtype=np.float32)
         self.terminal_memory = np.zeros(self.mem_size, dtype=np.bool_)
 
     def store_transition(self, state, action, reward, state_, done):
@@ -25,6 +25,7 @@ class ReplayBuffer():
             # fallback: if action was an array-like, take first element
             a = int(np.array(action).reshape(-1)[0])
 
+        # state may already be a flat vector (from your flatten_observation)
         self.state_memory[index] = state
         self.new_state_memory[index] = state_
         self.action_memory[index] = a

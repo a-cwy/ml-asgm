@@ -17,14 +17,14 @@ class CriticNetwork(nn.Module):
         self.n_actions = n_actions
         self.name = name
         self.checkpoint_dir = chkpt_dir
-        self.checkpoint_file = os.path.join(self.checkpoint_dir, name+'_sac')
+        self.checkpoint_file = os.path.join(self.checkpoint_dir, name + '_sac.pth')
 
         # critic takes state and action (for discrete action we will pass one-hot)
         self.fc1 = nn.Linear(self.input_dims[0] + n_actions, self.fc1_dims)
         self.fc2 = nn.Linear(self.fc1_dims, self.fc2_dims)
         self.q = nn.Linear(self.fc2_dims, 1)
 
-        self.optimizer = optim.Adam(self.parameters(), lr=beta)
+        self.optimizer = optim.AdamW(self.parameters(), lr=beta, weight_decay=1e-5)
         self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
         self.to(self.device)
     
@@ -37,6 +37,7 @@ class CriticNetwork(nn.Module):
         return q
 
     def save_checkpoint(self):
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
         T.save(self.state_dict(), self.checkpoint_file)
 
     def load_checkpoint(self):
@@ -52,13 +53,13 @@ class ValueNetwork(nn.Module):
         self.fc2_dims = fc2_dims
         self.name = name
         self.checkpoint_dir = chkpt_dir
-        self.checkpoint_file = os.path.join(self.checkpoint_dir, name+'_sac')
+        self.checkpoint_file = os.path.join(self.checkpoint_dir, name + '_sac.pth')
 
         self.fc1 = nn.Linear(*self.input_dims, self.fc1_dims)
         self.fc2 = nn.Linear(self.fc1_dims, fc2_dims)
         self.v = nn.Linear(self.fc2_dims, 1)
 
-        self.optimizer = optim.Adam(self.parameters(), lr=beta)
+        self.optimizer = optim.AdamW(self.parameters(), lr=beta, weight_decay=1e-5)
         self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
         self.to(self.device)
 
@@ -71,6 +72,7 @@ class ValueNetwork(nn.Module):
         return v
 
     def save_checkpoint(self):
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
         T.save(self.state_dict(), self.checkpoint_file)
 
     def load_checkpoint(self):
@@ -87,7 +89,7 @@ class ActorNetwork(nn.Module):
         self.n_actions = n_actions
         self.name = name
         self.checkpoint_dir = chkpt_dir
-        self.checkpoint_file = os.path.join(self.checkpoint_dir, name+'_sac')
+        self.checkpoint_file = os.path.join(self.checkpoint_dir, name + '_sac.pth')
         self.max_action = max_action  # if None -> treat as discrete
         self.reparam_noise = 1e-6
 
@@ -100,7 +102,7 @@ class ActorNetwork(nn.Module):
         self.mu = nn.Linear(self.fc2_dims, self.n_actions)
         self.sigma = nn.Linear(self.fc2_dims, self.n_actions)
 
-        self.optimizer = optim.Adam(self.parameters(), lr=alpha)
+        self.optimizer = optim.AdamW(self.parameters(), lr=alpha, weight_decay=1e-5)
         self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
         self.to(self.device)
 
@@ -115,6 +117,12 @@ class ActorNetwork(nn.Module):
         return mu, sigma
 
     def sample_normal(self, state, reparameterize=True):
+        """
+        Returns a triple (action_for_critic, log_prob, discrete_index_or_None)
+
+        - For discrete: action_for_critic = one-hot tensor, log_prob shape (batch,1), index tensor shape (batch,)
+        - For continuous: action_for_critic = scaled action tensor, log_prob shape (batch,1), index = None
+        """
         mu, sigma = self.forward(state)
 
         # If max_action is None treat as discrete action space (Categorical)
@@ -129,7 +137,7 @@ class ActorNetwork(nn.Module):
             action_one_hot = F.one_hot(indices, num_classes=self.n_actions).float().to(self.device)
             # log_prob of chosen action (shape -> (batch,1))
             log_prob = cat.log_prob(indices).unsqueeze(1)
-            return action_one_hot, log_prob
+            return action_one_hot, log_prob, indices
 
         # Continuous action (original behavior)
         probabilities = Normal(mu, sigma)
@@ -138,15 +146,18 @@ class ActorNetwork(nn.Module):
         else:
             actions = probabilities.sample()
 
-        # scale using max_action (can be scalar or vector)
+        # tanh transform and correct log-prob with Jacobian of tanh
+        tanh_actions = T.tanh(actions)
         max_action_tensor = T.tensor(self.max_action).to(self.device)
-        action = T.tanh(actions) * max_action_tensor
+        action = tanh_actions * max_action_tensor
         log_probs = probabilities.log_prob(actions)
-        log_probs -= T.log(1 - action.pow(2) + self.reparam_noise)
+        # use tanh_actions (pre-scale) for jacobian correction to keep values in (-1,1)
+        log_probs -= T.log(1 - tanh_actions.pow(2) + self.reparam_noise)
         log_probs = log_probs.sum(1, keepdim=True)
-        return action, log_probs
+        return action, log_probs, None
 
     def save_checkpoint(self):
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
         T.save(self.state_dict(), self.checkpoint_file)
 
     def load_checkpoint(self):

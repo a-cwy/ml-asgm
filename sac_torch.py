@@ -4,12 +4,12 @@ import torch.nn.functional as F
 import numpy as np
 from sac_buffer import ReplayBuffer
 from sac_networks import ActorNetwork, CriticNetwork, ValueNetwork
-import gymnasium as gym
 
 class Agent():
     def __init__(self, alpha=0.0003, beta=0.0003, input_dims=[8],
-            env=None, gamma=0.99, n_actions=2, max_size=1000000, tau=0.005,
-            layer1_size=256, layer2_size=256, batch_size=256, reward_scale=2):
+        env=None, gamma=0.99, n_actions=2, max_size=1000000, tau=0.005,
+        layer1_size=256, layer2_size=256, batch_size=256, reward_scale=5.0,
+        ent_coef=0.2):
         self.gamma = gamma
         self.tau = tau
         self.memory = ReplayBuffer(max_size, input_dims, n_actions)
@@ -18,17 +18,14 @@ class Agent():
 
         chkpt_dir = 'models/sac'
 
-        # detect discrete action space
-        self.discrete = isinstance(env.action_space, gym.spaces.Discrete)
-
-        # set max_action for continuous, else None for discrete
-        if not self.discrete and hasattr(env.action_space, 'high'):
+        # Detect continuous vs discrete:
+        if hasattr(env.action_space, 'high'):
             max_action = env.action_space.high
         else:
             max_action = None
 
-        self.actor = ActorNetwork(alpha, input_dims, max_action=max_action,
-                    n_actions=n_actions, name='actor', chkpt_dir=chkpt_dir)
+        self.actor = ActorNetwork(alpha, input_dims, max_action=max_action, n_actions=n_actions,
+                    name='actor', chkpt_dir=chkpt_dir)
         
         self.critic_1 = CriticNetwork(beta, input_dims, n_actions=n_actions,
                     name='critic_1', chkpt_dir=chkpt_dir)
@@ -38,20 +35,42 @@ class Agent():
         self.target_value = ValueNetwork(beta, input_dims, name='target_value', chkpt_dir=chkpt_dir)
 
         self.scale = reward_scale
-        self.update_network_parameters(tau=1)
+        # Entropy coefficient (temperature) for SAC losses
+        # Smaller values reduce entropy regularization; tune for your env.
+        self.entropy_alpha = ent_coef
+        self.update_network_parameters(tau=1.0)
 
-    def choose_action(self, observation):
+    def choose_action(self, observation, deterministic=False):
+        """
+        Returns an action usable by env.step():
+        - For discrete env: returns scalar int (sampled category if deterministic=False,
+          otherwise argmax index)
+        - For continuous env: returns numpy array (sampled if deterministic=False, otherwise mean action)
+        """
         state = T.Tensor([observation]).to(self.actor.device)
-        actions, _ = self.actor.sample_normal(state, reparameterize=False)
 
-        # For discrete: actions is one-hot tensor (batch, n_actions)
-        if self.discrete:
-            # return index (int)
-            idx = actions.argmax(dim=-1).cpu().detach().numpy()[0]
-            return int(idx)
+        # For discrete case, actor.sample_normal returns (one_hot, log_prob, indices)
+        actions_for_critic, logp, indices = self.actor.sample_normal(state, reparameterize=False)
+
+        if indices is not None:
+            if deterministic:
+                # deterministic: use logits -> argmax
+                mu, _ = self.actor.forward(state)
+                probs = F.softmax(mu, dim=-1)
+                return int(probs.argmax(dim=-1).cpu().numpy()[0])
+            else:
+                # stochastic: sampled index
+                return int(indices.cpu().numpy()[0])
         else:
-            # continuous case (action array)
-            return actions.cpu().detach().numpy()[0]
+            # continuous
+            if deterministic:
+                # return mean action (mu) clipped as in forward
+                mu, sigma = self.actor.forward(state)
+                max_action_tensor = T.tensor(self.actor.max_action).to(self.actor.device)
+                action = T.tanh(mu) * max_action_tensor
+                return action.cpu().detach().numpy()[0]
+            else:
+                return actions_for_critic.cpu().detach().numpy()[0]
 
     def remember(self, state, action, reward, new_state, done):
         self.memory.store_transition(state, action, reward, new_state, done)
@@ -60,18 +79,9 @@ class Agent():
         if tau is None:
             tau = self.tau
 
-        target_value_params = self.target_value.named_parameters()
-        value_params = self.value.named_parameters()
-
-        target_value_state_dict = dict(target_value_params)
-        value_state_dict = dict(value_params)
-
-        # soft update: target = tau*value + (1-tau)*target
-        for name in value_state_dict:
-            value_state_dict[name] = tau * value_state_dict[name].clone() + \
-                    (1 - tau) * target_value_state_dict[name].clone()
-
-        self.target_value.load_state_dict(value_state_dict)
+        # Polyak update: target = tau * source + (1-tau) * target
+        for target_param, param in zip(self.target_value.parameters(), self.value.parameters()):
+            target_param.data.copy_(tau * param.data + (1.0 - tau) * target_param.data)
 
     def save_models(self):
         print('.... saving models ....')
@@ -111,33 +121,42 @@ class Agent():
         # zero out the value for terminal states
         value_[done] = 0.0
 
-        # Value network update
-        actions_new, log_probs = self.actor.sample_normal(state, reparameterize=False)
-        # For discrete actor actions_new is one-hot, for continuous shaped actions
+        # Value network update with gradient clipping
+        actions_new, log_probs, _ = self.actor.sample_normal(state, reparameterize=False)
+        # ensure actions_new is in correct device/type for critic
+        if actions_new is None:
+            raise RuntimeError("actor.sample_normal returned None for actions_new")
         q1_new_policy = self.critic_1.forward(state, actions_new)
         q2_new_policy = self.critic_2.forward(state, actions_new)
         critic_value = T.min(q1_new_policy, q2_new_policy).view(-1)
 
         log_probs = log_probs.view(-1)
         self.value.optimizer.zero_grad()
-        value_target = critic_value - log_probs
+        # value target: Q - alpha * logp
+        value_target = critic_value - self.entropy_alpha * log_probs
         value_loss = 0.5 * F.mse_loss(value, value_target.detach())
         value_loss.backward(retain_graph=True)
+
+        # Clip gradients to prevent explosion
+        T.nn.utils.clip_grad_norm_(self.value.parameters(), max_norm=1.0)
         self.value.optimizer.step()
 
-        # Actor update
-        actions_new, log_probs = self.actor.sample_normal(state, reparameterize=True)
+        # Actor update with gradient clipping
+        actions_new, log_probs, _ = self.actor.sample_normal(state, reparameterize=True)
         q1_new_policy = self.critic_1.forward(state, actions_new)
         q2_new_policy = self.critic_2.forward(state, actions_new)
         critic_value = T.min(q1_new_policy, q2_new_policy).view(-1)
 
-        actor_loss = log_probs.view(-1) - critic_value
+        # actor loss: minimize (alpha * logp - Q)
+        actor_loss = self.entropy_alpha * log_probs.view(-1) - critic_value
         actor_loss = T.mean(actor_loss)
         self.actor.optimizer.zero_grad()
         actor_loss.backward(retain_graph=True)
+
+        T.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
         self.actor.optimizer.step()
 
-        # Critics update (use stored actions -> convert to one-hot)
+        # Critics update with gradient clipping
         self.critic_1.optimizer.zero_grad()
         self.critic_2.optimizer.zero_grad()
         q_hat = self.scale * reward + self.gamma * value_
@@ -148,6 +167,10 @@ class Agent():
 
         critic_loss = critic_1_loss + critic_2_loss
         critic_loss.backward()
+
+        T.nn.utils.clip_grad_norm_(self.critic_1.parameters(), max_norm=1.0)
+        T.nn.utils.clip_grad_norm_(self.critic_2.parameters(), max_norm=1.0)
+
         self.critic_1.optimizer.step()
         self.critic_2.optimizer.step()
 
