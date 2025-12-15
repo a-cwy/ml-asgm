@@ -1,0 +1,35 @@
+//          v1-500
+            env: gym.Env,
+            actor_model: nn.Module = None,
+            critic_model: nn.Module = None,
+            discount_factor: float = 0.99,
+            learning_rate: float = 1e-3,
+            gamma: float = 0.99,
+            n_steps: int = 50,
+            entropy_coef: float = 0.01,
+            value_loss_coef: float = 0.5,
+            max_grad_norm: float = 0.5
+
+//          V2-500
+            env: gym.Env,
+            actor_model: nn.Module = None,
+            critic_model: nn.Module = None,
+            discount_factor: float = 0.99,
+            learning_rate: float = 1e-4,
+            gamma: float = 0.99,
+            n_steps: int = 50,
+            entropy_coef: float = 0.01,
+            value_loss_coef: float = 0.5,
+            max_grad_norm: float = 0.5
+
+  v3-500
+           env: gym.Env,
+            actor_model: nn.Module = None,
+            critic_model: nn.Module = None,
+            discount_factor: float = 0.99,
+            learning_rate: float = 3e-4,
+            gamma: float = 0.99,
+            n_steps: int = 50,
+            entropy_coef: float = 0.01,
+            value_loss_coef: float = 0.5,
+            max_grad_norm: float = 0.5

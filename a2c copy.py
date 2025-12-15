@@ -1,4 +1,7 @@
+## FOR BACKUP PURPOSES ONLY
+
 import sys
+import gymnasium as gym
 import gymnasium as gym
 import torch
 import torch.nn as nn
@@ -49,6 +52,7 @@ class A2CAgent():
             env: gym.Env,
             actor_model: nn.Module = None,
             critic_model: nn.Module = None,
+            discount_factor: float = 0.99,
             learning_rate: float = 1e-4,  #test with 1e-4, 3e-4, 5e-4
             gamma: float = 0.99,
             n_steps: int = 50,
@@ -57,6 +61,7 @@ class A2CAgent():
             max_grad_norm: float = 0.5
         ):
         self.env = env
+        self.discount_factor = discount_factor
         self.learning_rate = learning_rate
         self.gamma = gamma
         self.n_steps = n_steps
@@ -103,9 +108,8 @@ class A2CAgent():
         return action.item(), dist.log_prob(action), dist.entropy()
 
     def act(self):
-        """Run one episode using the current policy."""
+        """Run one episode using the current policy (deterministic argmax)."""
         #breakdown rewards
-        rewards_breakdown = [[0.0, 0.0, 0.0, 0.0]]
         obs, _ = self.env.reset()
         state = self._flatten_obs(obs)
         terminated = False
@@ -120,11 +124,11 @@ class A2CAgent():
             next_obs, reward, terminated, truncated, info = self.env.step(action)
             total_reward += reward
             state = self._flatten_obs(next_obs)
-            rewards_breakdown.append(list(info["rewards"].values()))
+            rewards_breakdown = np.add(np.zeros(len(info["rewards"])), list(info["rewards"].values()))
             # if terminated or truncated:
             #     break
-        print(f"ACT: Episode rewards breakdown {utils.format_rewards(np.sum(rewards_breakdown, axis=0))}")
-        utils.plot_breakdown_cumulative(rewards_breakdown)
+        print(f"ACT: Episode rewards breakdown {utils.format_rewards(rewards_breakdown)}")
+
     def save_models(self, actor_path, critic_path):
         """
         Save actor and critic state_dicts to the given paths. Also saves an
@@ -344,7 +348,7 @@ class A2CAgent():
 
 #### TRAINING CONFIG
 from datetime import datetime
-LOAD_PRETRAINED = True
+LOAD_PRETRAINED = False
 USE_DATESTAMP = False
 
 # Get the current date and time
@@ -358,11 +362,11 @@ VERSION_NUM = f"{version}"
 episodes = 500  #CHANGE THIS TO DESIRED NUMBER OF EPISODES
 
 # Define model save paths
-ACTOR_DIR = f"./models/a2c/a2c-v3-e500-actor.pth"
-CRITIC_DIR = f"./models/a2c/a2c-v3-e500-critic.pth"
+# ACTOR_DIR = f"./models/a2c/a2c-20251204_234342-e200-actor.pth"
+# CRITIC_DIR = f"./models/a2c/a2c-20251204_234342-e200-critic.pth"
 
-# ACTOR_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{episodes}-actor.pth"
-# CRITIC_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{episodes}-critic.pth"
+ACTOR_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{episodes}-actor.pth"
+CRITIC_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{episodes}-critic.pth"
 
 if __name__ == "__main__":
     utils.init()
