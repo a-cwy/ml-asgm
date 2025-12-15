@@ -1,6 +1,7 @@
 from environment import WaterHeaterEnv
 import gymnasium as gym
 import matplotlib.pyplot as plt
+import numpy as np
 
 def init():
     """
@@ -26,6 +27,22 @@ def format_rewards(reward_breakdown):
     """
 
     return formatted_string
+
+def plot_breakdown_cumulative(reward_breakdown):
+    cumsum = np.swapaxes(np.cumsum(reward_breakdown, axis = 0), 0, 1)
+    total = np.sum(cumsum, axis = 0)
+
+    plt.plot(cumsum[0], 'g-', label = 'Comfort') # Comfort
+    plt.plot(cumsum[1], 'b-', label = 'Hygiene') # Hygiene
+    plt.plot(cumsum[2], 'y-', label = 'Energy') # Energy
+    plt.plot(cumsum[3], 'r-', label = 'Safety') # Safety
+    plt.plot(total, 'k-', label = 'Total Reward') # Total
+    plt.legend(loc = "upper left")
+    plt.xlabel("Step")
+    plt.ylabel("Reward")
+    plt.title("Cumulative Rewards by Type")
+    plt.grid()
+    plt.show()
 
 def plot_rewards(rewards_per_episode):
     plt.plot(rewards_per_episode)

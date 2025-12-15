@@ -2,6 +2,7 @@ import gymnasium as gym
 import numpy as np
 import keras
 import random
+from exploration import ExplorationStrategy, EpsilonGreedy
 
 from collections import deque
 
@@ -12,11 +13,9 @@ class DQNAgent():
             input_size, 
             output_size, 
             learning_rate = 0.001, 
-            epsilon = 1,
-            min_epsilon = 0.01,
-            epsilon_decay = 0.995,
             discount_factor = 0.9,
             mini_batch_size = 128,
+            exploration:ExplorationStrategy = None,
             replay_memory_size = 1500 
         ):
 
@@ -25,11 +24,11 @@ class DQNAgent():
         self.output_size = output_size
 
         self.learning_rate = learning_rate
-        self.epsilon = epsilon
-        self.min_epsilon = min_epsilon
-        self.epsilon_decay = epsilon_decay
         self.discount_factor = discount_factor
         self.mini_batch_size = mini_batch_size
+        
+        assert exploration is not None
+        self.exploration = exploration
         
         self.memory = deque([], maxlen = replay_memory_size)
 
@@ -87,7 +86,7 @@ class DQNAgent():
             truncated = False
 
             while (not terminated and not truncated):
-                if np.random.random() < self.epsilon:
+                if self.exploration.eval():
                     action = self.env.action_space.sample()
                 else:
                     action = self.policy_network.predict(self._flatten_obs(obs), verbose = 0)[0].argmax()
@@ -106,12 +105,11 @@ class DQNAgent():
                 mini_batch = random.sample(self.memory, self.mini_batch_size)
                 self._optimize(mini_batch)
 
-            self.epsilon = max(self.epsilon * self.epsilon_decay, self.min_epsilon)
+            self.exploration.decay()
 
             self._sync_network()
 
             print(f"Episode: {e + 1}")
-            print(f"Epsilon: {self.epsilon}")
             print(utils.format_rewards(rewards_breakdown))
 
         return rewards_per_episode
@@ -119,7 +117,7 @@ class DQNAgent():
 
 
     def act(self):
-        rewards_breakdown = [0, 0, 0, 0]
+        rewards_breakdown = [[0.0, 0.0, 0.0, 0.0]]
         obs, _ = self.env.reset()
         terminated = False
         truncated = False
@@ -128,9 +126,10 @@ class DQNAgent():
             action = self.target_network.predict(self._flatten_obs(obs), verbose = 0)[0].argmax()
             next_obs, reward, terminated, truncated, info = self.env.step(action)
             obs = next_obs
-            rewards_breakdown = np.add(rewards_breakdown, list(info["rewards"].values()))
+            rewards_breakdown.append(list(info["rewards"].values()))
 
-        print(utils.format_rewards(rewards_breakdown))
+        print(utils.format_rewards(np.sum(rewards_breakdown, axis = 0)))
+        utils.plot_breakdown_cumulative(rewards_breakdown)
 
 
                 
@@ -138,6 +137,7 @@ class DQNAgent():
 ###########################################################
 
 LOAD_PRETRAINED = True
+SAVE = False
 VERSION_NUM = "v4-0-0"
 EPISODES_NUM = 100
 POLICY_DIR = f"./models/dqn/dqn-{VERSION_NUM}-e{EPISODES_NUM}-policy.keras"
@@ -146,7 +146,7 @@ TARGET_DIR = f"./models/dqn/dqn-{VERSION_NUM}-e{EPISODES_NUM}-target.keras"
 import utils
 utils.init()
 env = gym.make("WaterHeater-v0")
-agent = DQNAgent(env, 6, 4)
+agent = DQNAgent(env, 6, 4, exploration = EpsilonGreedy(epsilon = 1, min_epsilon = 0.01, epsilon_decay = 0.995))
 
 if LOAD_PRETRAINED:
     agent.load_models(POLICY_DIR, TARGET_DIR)
@@ -154,6 +154,8 @@ if LOAD_PRETRAINED:
 else:
     rewards = agent.train(EPISODES_NUM)
     print(rewards)
+    utils.plot_rewards(rewards)
 
-    agent.policy_network.save(POLICY_DIR)
-    agent.target_network.save(TARGET_DIR)
+    if SAVE:
+        agent.policy_network.save(POLICY_DIR)
+        agent.target_network.save(TARGET_DIR)
