@@ -44,10 +44,11 @@ def plot_breakdown_cumulative(reward_breakdown):
     plt.grid()
     plt.show()
 
-def plot_rewards(rewards_per_episode):
+def plot_rewards(rewards_per_episode, path):
     plt.plot(rewards_per_episode)
     plt.xlabel("Episode")
     plt.ylabel("Total Reward")
     plt.title("Total Reward per Episode")
     plt.grid()
-    plt.show()
+    plt.savefig(path)
+    plt.close()

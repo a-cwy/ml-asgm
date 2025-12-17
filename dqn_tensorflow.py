@@ -2,8 +2,9 @@ import gymnasium as gym
 import numpy as np
 import keras
 import random
-from exploration import ExplorationStrategy, EpsilonGreedy
+import utils
 
+from exploration import ExplorationStrategy
 from collections import deque
 
 class DQNAgent():
@@ -86,12 +87,19 @@ class DQNAgent():
             truncated = False
 
             while (not terminated and not truncated):
-                if self.exploration.eval():
+                # EpsilonGreedy
+                if (self.exploration.get_action()):
                     action = self.env.action_space.sample()
                 else:
                     action = self.policy_network.predict(self._flatten_obs(obs), verbose = 0)[0].argmax()
 
+                # ThompsonSampling
+                # action = self.exploration.get_action()
+
                 next_obs, reward, terminated, truncated, info = self.env.step(action)
+                
+                # ThompsonSampling
+                # self.exploration.update(action, reward)
 
                 transition = (obs, reward, action, next_obs, terminated or truncated)
                 self.memory.append(transition)
@@ -100,12 +108,14 @@ class DQNAgent():
 
                 rewards_per_episode[e] += reward
                 rewards_breakdown = np.add(rewards_breakdown, list(info["rewards"].values()))
+            
+            # EpsilonGreedy
+            self.exploration.update()
 
             if len(self.memory) > self.mini_batch_size:
                 mini_batch = random.sample(self.memory, self.mini_batch_size)
                 self._optimize(mini_batch)
 
-            self.exploration.decay()
 
             self._sync_network()
 
@@ -130,32 +140,3 @@ class DQNAgent():
 
         print(utils.format_rewards(np.sum(rewards_breakdown, axis = 0)))
         utils.plot_breakdown_cumulative(rewards_breakdown)
-
-
-                
-
-###########################################################
-
-LOAD_PRETRAINED = True
-SAVE = False
-VERSION_NUM = "v4-0-0"
-EPISODES_NUM = 100
-POLICY_DIR = f"./models/dqn/dqn-{VERSION_NUM}-e{EPISODES_NUM}-policy.keras"
-TARGET_DIR = f"./models/dqn/dqn-{VERSION_NUM}-e{EPISODES_NUM}-target.keras"
-
-import utils
-utils.init()
-env = gym.make("WaterHeater-v0")
-agent = DQNAgent(env, 6, 4, exploration = EpsilonGreedy(epsilon = 1, min_epsilon = 0.01, epsilon_decay = 0.995))
-
-if LOAD_PRETRAINED:
-    agent.load_models(POLICY_DIR, TARGET_DIR)
-    agent.act()
-else:
-    rewards = agent.train(EPISODES_NUM)
-    print(rewards)
-    utils.plot_rewards(rewards)
-
-    if SAVE:
-        agent.policy_network.save(POLICY_DIR)
-        agent.target_network.save(TARGET_DIR)
