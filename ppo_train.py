@@ -60,11 +60,11 @@ class PPOMemory:
 
 class ActorNetwork(nn.Module):
     def __init__(self, n_actions, input_dims, alpha,
-                 fc1_dims=256, fc2_dims=256, chkpt_dir='tmp/ppo'):
+                 fc1_dims=256, fc2_dims=256, chkpt_dir='models/ppo'):
         super(ActorNetwork, self).__init__()
 
         os.makedirs(chkpt_dir,exist_ok=True)
-        self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_ppo.pth')
+        self.checkpoint_file = os.path.join(chkpt_dir, 'actor_best.pth')
 
         self.actor = nn.Sequential(
             nn.Linear(*input_dims, fc1_dims),
@@ -99,7 +99,7 @@ class CriticNetwork(nn.Module):
         super(CriticNetwork, self).__init__()
 
         os.makedirs(chkpt_dir, exist_ok=True)
-        self.checkpoint_file = os.path.join(chkpt_dir, 'critic_torch_ppo.pth')
+        self.checkpoint_file = os.path.join(chkpt_dir, 'critic_best.pth')
 
         self.critic = nn.Sequential(
             nn.Linear(*input_dims, fc1_dims),
@@ -266,14 +266,16 @@ class Agent:
 
     def act(self, env, max_steps=2*7*96):
         """
-        Evaluate the current PPO policy without learning.
+        Evaluate the trained PPO policy (NO learning).
         Runs one deterministic episode.
         """
         obs, _ = env.reset()
         state = self._process_obs(obs)
 
-        total_reward = 0.0
+        terminated = False
+        truncated = False
         steps = 0
+        total_reward = 0.0
 
         rewards_breakdown = {
             "comfort": 0.0,
@@ -281,21 +283,17 @@ class Agent:
             "energy": 0.0,
             "safety": 0.0
         }
-
-        terminated = False
-        truncated = False
-        
         while not terminated and not truncated and steps < max_steps:
             state_t = T.tensor(state, dtype=T.float32).unsqueeze(0).to(self.actor.device)
 
-        # Deterministic action (NO exploration)
+        # Deterministic action (no exploration)
         with T.no_grad():
             dist = self.actor(state_t)
             action = dist.probs.argmax(dim=-1).item()
 
         next_obs, reward, terminated, truncated, info = env.step(action)
-        total_reward += reward
 
+        total_reward += reward
         for k in rewards_breakdown:
             rewards_breakdown[k] += info["rewards"][k]
 
@@ -303,4 +301,3 @@ class Agent:
         steps += 1
 
         return total_reward, rewards_breakdown
-
