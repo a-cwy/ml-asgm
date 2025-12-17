@@ -3,7 +3,7 @@ import numpy as np
 import torch as T
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributions.categorical import Categorical
+from torch.distributions.categorical import Categorical #using categorical because actions are discrete (0-3) as stated in environment
 
 
 # MEMORY BUFFER
@@ -20,13 +20,13 @@ class PPOMemory:
         self.batch_size = batch_size
 
     def generate_batches(self):
-        n_states = len(self.states)
-        batch_start = np.arange(0, n_states, self.batch_size)
+        n_states = len(self.states) #total number of states collected during rollout
+        batch_start = np.arange(0, n_states, self.batch_size) #used to split rollout data into mini batches
 
         indices = np.arange(n_states, dtype=np.int64)
         np.random.shuffle(indices)
-
-        batches = [indices[i:i+self.batch_size] for i in batch_start]
+#each states, actions, etc. are split into mini batches representing with different indices for training to avoid bias over time by shuffling the batch indices
+        batches = [indices[i:i+self.batch_size] for i in batch_start] 
 
         return np.array(self.states), \
                np.array(self.actions), \
@@ -36,6 +36,7 @@ class PPOMemory:
                np.array(self.dones), \
                batches
 
+# Store memory during rollout, trajectory collection held here so PPO can perform on-policy updates
     def store_memory(self, state, action, probs, vals, reward, done):
         self.states.append(state)
         self.actions.append(action)
@@ -44,6 +45,7 @@ class PPOMemory:
         self.rewards.append(reward)
         self.dones.append(done)
 
+#Clears stored rollout data after policy optimization. PPO is an on-policy algorithm, so once the policy is updated, previously collected trajectories become invalid and must be discarded
     def clear_memory(self):
         self.states = []
         self.probs = []
@@ -62,7 +64,7 @@ class ActorNetwork(nn.Module):
         super(ActorNetwork, self).__init__()
 
         os.makedirs(chkpt_dir,exist_ok=True)
-        self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_ppo')
+        self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_ppo.pth')
 
         self.actor = nn.Sequential(
             nn.Linear(*input_dims, fc1_dims),
@@ -97,7 +99,7 @@ class CriticNetwork(nn.Module):
         super(CriticNetwork, self).__init__()
 
         os.makedirs(chkpt_dir, exist_ok=True)
-        self.checkpoint_file = os.path.join(chkpt_dir, 'critic_torch_ppo')
+        self.checkpoint_file = os.path.join(chkpt_dir, 'critic_torch_ppo.pth')
 
         self.critic = nn.Sequential(
             nn.Linear(*input_dims, fc1_dims),
@@ -130,12 +132,14 @@ class Agent:
         input_dims,
         gamma=0.995,
         alpha=1e-4,
+        entropy_coef=0.01,
         gae_lambda=0.95,
         policy_clip=0.2,
         batch_size=512,
         N=2048,
         n_epochs=4
     ):
+        self.entropy_coef = entropy_coef
         self.gamma = gamma
         self.policy_clip = policy_clip
         self.n_epochs = n_epochs
@@ -154,8 +158,8 @@ class Agent:
         return np.array([
             obs["day"],
             obs["time"],
-            obs["waterTemperature"][0],
-            obs["targetTemperature"][0],
+            obs["waterTemperature"],
+            obs["targetTemperature"],
             obs["timeSinceSterilization"],
             obs["forecast"]
         ], dtype=np.float32)
@@ -195,10 +199,12 @@ class Agent:
         self.actor.load_checkpoint()
         self.critic.load_checkpoint()
 
+# Learning phase from the rollout
     def learn(self):
         if len(self.memory.states) < self.memory.batch_size:
             return
 
+#
         for _ in range(self.n_epochs):
             state_arr, action_arr, old_prob_arr, vals_arr, reward_arr, dones_arr, batches = \
                 self.memory.generate_batches()
@@ -245,8 +251,7 @@ class Agent:
                 actor_loss = -T.min(weighted_probs, clipped_probs).mean()
                 critic_loss = (batch_returns - critic_value).pow(2).mean()
                 entropy = dist.entropy().mean()
-                entropy_coef = 0.01 + (reward_arr < 0).mean() * 0.04
-                loss = actor_loss + 0.5 * critic_loss - entropy_coef * entropy
+                loss = actor_loss + 0.5 * critic_loss - self.entropy_coef * entropy
 
                 self.actor.optimizer.zero_grad()
                 self.critic.optimizer.zero_grad()
@@ -258,3 +263,42 @@ class Agent:
                 self.critic.optimizer.step()
 
         self.memory.clear_memory()
+
+    def act(self, env, max_steps=2*7*96):
+        """
+        Evaluate the current PPO policy without learning.
+        Runs one deterministic episode.
+        """
+        obs, _ = env.reset()
+        state = self._process_obs(obs)
+
+        terminated = False
+        truncated = False
+        steps = 0
+        total_reward = 0.0
+
+        rewards_breakdown = {
+            "comfort": 0.0,
+            "hygiene": 0.0,
+            "energy": 0.0,
+            "safety": 0.0
+        }
+        while not terminated and not truncated and steps < max_steps:
+            state_t = T.tensor(state, dtype=T.float32).unsqueeze(0).to(self.actor.device)
+
+        # 🔒 Deterministic action (NO exploration)
+        with T.no_grad():
+            dist = self.actor(state_t)
+            action = dist.probs.argmax(dim=-1).item()
+
+        next_obs, reward, terminated, truncated, info = env.step(action)
+        total_reward += reward
+
+        for k in rewards_breakdown:
+            rewards_breakdown[k] += info["rewards"][k]
+
+        state = self._process_obs(next_obs)
+        steps += 1
+
+        return total_reward, rewards_breakdown
+
