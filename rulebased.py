@@ -9,9 +9,12 @@ utils.init()
 # Initializing the environment and running a reset to randomize starting state.
 env = gym.make("WaterHeater-v0")
 
-EPISODES = 1000
+EPISODES = 100
 reward_list = []
 reward_breakdown = [0.0, 0.0, 0.0, 0.0]
+
+#TO PLOT CUMMULATIVE REWARDS BREAKDOWN
+rewards_breakdown_per_episode = [[0.0,0.0,0.0,0.0]]
 # Rule-based agent to meet basic needs.
 for e in range(EPISODES):
     obs, _ = env.reset()
@@ -29,7 +32,7 @@ for e in range(EPISODES):
             next_obs, reward, terminated, truncated, info = env.step(0)
 
         obs = next_obs
-
+        rewards_breakdown_per_episode.append(list(info["rewards"].values()))
         total_episode_reward += np.float32(reward)
 
         # Cumulative reward for each subcategory.
@@ -41,9 +44,16 @@ for e in range(EPISODES):
         if terminated or truncated:
             # print("Simulation ended.")
             break
-
+    
+    rewards_breakdown_per_episode.append(list(info["rewards"].values()))
     reward_list.append(total_episode_reward)
 
 # Utility function to print a breakdown of the rewards.
 reward_breakdown = np.divide(reward_breakdown, EPISODES)
 print(utils.format_rewards(reward_breakdown))
+# print("Reward list:", reward_list)
+utils.plot_rewards(reward_list)
+np.save("rulebased_rewards.npy", np.array(reward_list))
+
+# print("Reward breakdown per episode:", rewards_breakdown_per_episode)
+utils.plot_breakdown_cumulative(np.array(rewards_breakdown_per_episode))

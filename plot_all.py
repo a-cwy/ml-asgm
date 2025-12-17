@@ -48,20 +48,24 @@ rewards_dqn = scores = [
     977.5, 988.0, 938.0, 925.5
 ]
 
-print(len(rewards_ppo), len(rewards_a2c), len(rewards_sac), len(rewards_dqn))
+clrmap = plt.get_cmap('rainbow')
+
+rewards_rulebased = np.load("rulebased_rewards.npy")
+
+print(len(rewards_ppo), len(rewards_a2c), len(rewards_sac), len(rewards_dqn), len(rewards_rulebased))
 
 # Ensure all reward lists are of the same length by truncating to the shortest
-if len(rewards_ppo) != len(rewards_a2c) or len(rewards_ppo) != len(rewards_sac) or len(rewards_ppo) != len(rewards_dqn):
-    min_length = min(len(rewards_ppo), len(rewards_a2c), len(rewards_sac), len(rewards_dqn))
+if len(rewards_ppo) != len(rewards_a2c) or len(rewards_ppo) != len(rewards_sac) or len(rewards_ppo) != len(rewards_dqn) or len(rewards_rulebased) != len(rewards_ppo):
+    min_length = min(len(rewards_ppo), len(rewards_a2c), len(rewards_sac), len(rewards_dqn), len(rewards_rulebased))
     rewards_ppo = rewards_ppo[:min_length]
     rewards_a2c = rewards_a2c[:min_length]
     rewards_sac = rewards_sac[:min_length]
     rewards_dqn = rewards_dqn[:min_length]
+    rewards_rulebased = rewards_rulebased[:min_length]
     print(f"Truncated all reward lists to length: {min_length}")
 
-alg_names = ["PPO", "A2C", "SAC", "DQN"]
-reward_lists = [rewards_ppo, rewards_a2c, np.array(rewards_sac), np.array(rewards_dqn)]
-
+alg_names = ["PPO", "A2C", "SAC", "DQN", "Rule-based"]
+reward_lists = [rewards_ppo, rewards_a2c, np.array(rewards_sac), np.array(rewards_dqn), rewards_rulebased]
 def plot_comparison(alg_names, reward_lists, save_path="plots/comparison_metrics.png"):
     import matplotlib.pyplot as plt
 
@@ -77,7 +81,7 @@ def plot_comparison(alg_names, reward_lists, save_path="plots/comparison_metrics
     plt.suptitle('RL Model Comparison Metrics (Evaluated over 100 episodes)')
 
     # get a colormap and generate distinct colors for each algorithm
-    cmap = plt.get_cmap('tab10')
+    cmap = clrmap
     colors = cmap(np.linspace(0, 1, len(alg_names)))
 
     axs[0].bar(x, avgs, width, color=colors)
@@ -92,8 +96,10 @@ def plot_comparison(alg_names, reward_lists, save_path="plots/comparison_metrics
 
     axs[2].bar(x, variance, width, color=colors)
     axs[2].set_title('Learning Instability (Variance)')
+    axs[2].set_ylabel('Variance (log scale)')
     axs[2].set_xticks(x)
     axs[2].set_xticklabels(alg_names, rotation=45, ha='right')
+    axs[2].set_yscale("log")
 
     for ax in axs:
         ax.grid(axis='y', linestyle='--', alpha=0.4)
@@ -101,7 +107,7 @@ def plot_comparison(alg_names, reward_lists, save_path="plots/comparison_metrics
     # print(type(avgs))
     print(f"Average: {avgs}, \n Cumulative: {cums},\n Variance: {variance}")
     plt.tight_layout()
-    # fig.savefig(save_path, dpi=200)
+    fig.savefig(save_path, dpi=200)
     print(f"Saved comparison plot to: {save_path}")
     plt.show()
 
@@ -111,39 +117,60 @@ def plot_comparison(alg_names, reward_lists, save_path="plots/comparison_metrics
 plot_comparison(alg_names=alg_names, reward_lists=reward_lists, save_path="plots/comparison_metrics.png")
 
 
-def plot_episodic_line(alg_names, reward_lists, save_path="episodic_rewards.png", 
-                       cumulative=False):
+def plot_episodic_line(alg_names, reward_lists, save_path="plots/episodic_rewards.png", cumulative=False, logscale=False, linthresh=1.0):
     """Plot episodic rewards as lines for each algorithm and save the figure.
 
     If `cumulative` is True, plot cumulative rewards (np.cumsum) per episode.
+    If `logscale` is True, use `log` y-scale when all series are positive,
+    otherwise use `symlog` which supports negative values (controlled by `linthresh`).
     """
     plt.figure(figsize=(10, 6))
-    cmap = plt.get_cmap('tab10')
+    cmap = clrmap
     colors = cmap(np.linspace(0, 1, len(alg_names)))
 
+    processed = []
+    # zip together names, rewards, colors
     for name, rewards, color in zip(alg_names, reward_lists, colors):
         r = np.array(rewards)
-
         if cumulative:
             r = np.cumsum(r)
+        processed.append((name, r, color))
+
+    # decide y-scale
+    if logscale:
+        all_positive = all((series > 0).all() for _, series, _ in processed)
+        yscale = 'log' if all_positive else 'symlog'
+    # else:
+    #     yscale = 'linear'
+
+    for name, r, color in processed:
         episodes = np.arange(1, len(r) + 1)
         plt.plot(episodes, r, label=name, color=color, linewidth=1.5)
 
     plt.xlabel('Episode')
-    plt.ylabel('Cumulative Reward' if cumulative else 'Reward')
-    plt.title('Cumulative Reward per Episode' if cumulative else 'Episodic Rewards')
+    plt.ylabel(('Cumulative Reward' if cumulative else 'Reward') + (' (log scale)' if logscale else ''))
+    plt.title(( 'Cumulative Reward per Episode' if cumulative else 'Episodic Rewards') + ( ' [log]' if logscale else ''))
     plt.legend(loc='best')
     plt.grid(linestyle='--', alpha=0.3)
+
+    if yscale == 'log':
+        plt.yscale('log')
+    elif yscale == 'symlog':
+        plt.yscale('symlog', linthresh=linthresh)
     plt.tight_layout()
 
-    # adjust default filename when plotting cumulative rewards
-    if cumulative:
-        save_path = "episodic_cumulative_rewards.png"
-
-    #plt.savefig(save_path, dpi=200)
-    print(f"Saved episodic reward plot to: {save_path}")
+    # adjust default filename when plotting cumulative or logscale variants
+    if save_path == "plots/episodic_rewards.png":
+        if cumulative and logscale:
+            save_path = "plots/episodic_cumulative_rewards_log.png"
+        elif cumulative:
+            save_path = "plots/episodic_cumulative_rewards.png"
+        elif logscale:
+            save_path = "plots/episodic_rewards_log.png"
+    plt.savefig(save_path, dpi=200)
+    print(f"Saved episodic reward plot to: {save_path} (yscale={yscale})")
     plt.show()
 
 
-# default: episodic (non-cumulative)
-plot_episodic_line(alg_names, reward_lists, cumulative=True)
+# default: episodic (non-cumulative, linear)
+plot_episodic_line(alg_names, reward_lists, logscale=True)
