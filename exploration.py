@@ -15,7 +15,7 @@ set epsilon to 1
 if random number > epsilon, explore, else exploit
 decay epsilon
     epsilon = epsilon * epsilon_decay
-    epislon cannot go below a minimum
+    epsilon cannot go below a minimum
 """
 class EpsilonGreedy(ExplorationStrategy):
     def __init__(
