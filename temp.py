@@ -1,6 +1,38 @@
 import utils
+import exploration_results_dqn as xpl
+import matplotlib.pyplot as plt
 import numpy as np
 
-rewards = [-50554.866720835606,-48643.777383514054,-48643.41743043671,-48643.33177507412,-48639.85144067909,-48637.6885108678,-48643.11622294365,-48642.66621401216,-48634.940029747304,-48634.66930769462]
+def metrics():
+    data = xpl.v5002().data
 
-utils.plot_rewards(rewards)
+    print("\n")
+    print(f"Final Reward: {data[-1]:.4f}")
+    print(f"Cum. Sum: {np.sum(data):.4f}")
+    print(f"Min: {min(data):.4f}")
+    print(f"Max: {max(data):.4f}")
+    print(f"Mean: {np.mean(data):.4f}")
+    print(f"S.D.: {np.std(data):.4f}")
+    print(f"Coef. Variation: {np.std(data)/np.mean(data):.4f}")
+    print("\n")
+
+def compare():
+    cmp = [
+        xpl.v5000().data,
+        xpl.v5001().data,
+        xpl.v5002().data
+    ]
+
+    plt.figure(figsize = (16, 8))
+    plt.yscale('symlog')
+    plt.plot(cmp[0], label = 'decay = 0.995')
+    plt.plot(cmp[1], 'orange', label = 'decay = 0.975')
+    plt.plot(cmp[2], 'green', label = 'decay = 0.95')
+    plt.xlabel("Episode")
+    plt.ylabel("Total Reward")
+    plt.title("Total Reward per Episode")
+    plt.legend(loc = "center right")
+    plt.grid()
+    plt.show()
+
+compare()
