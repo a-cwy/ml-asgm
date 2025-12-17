@@ -1,8 +1,9 @@
 """
 To compare different RL algorithms (PPO, A2C, SAC, DQN) based on their episodic rewards
 """
+VERSION = "v1"
 
-
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -50,7 +51,7 @@ rewards_dqn = scores = [
 
 clrmap = plt.get_cmap('rainbow')
 
-rewards_rulebased = np.load("rulebased_rewards.npy")
+rewards_rulebased = np.load("models/rulebased_rewards.npy")
 
 print(len(rewards_ppo), len(rewards_a2c), len(rewards_sac), len(rewards_dqn), len(rewards_rulebased))
 
@@ -66,6 +67,46 @@ if len(rewards_ppo) != len(rewards_a2c) or len(rewards_ppo) != len(rewards_sac) 
 
 alg_names = ["PPO", "A2C", "SAC", "DQN", "Rule-based"]
 reward_lists = [rewards_ppo, rewards_a2c, np.array(rewards_sac), np.array(rewards_dqn), rewards_rulebased]
+
+def compute_metrics(rewards):
+    r = np.asarray(rewards, dtype=np.float32)
+    n = r.shape[0]
+
+    mean_overall = float(np.mean(r)) if n > 0 else float("nan")
+    std_overall = float(np.std(r)) if n > 1 else float("nan")
+
+    cv_overall = float(std_overall / mean_overall) if (mean_overall != 0 and not np.isnan(mean_overall)) else float("nan")
+
+    metrics = {
+        "episodes": int(n),
+        "final_reward": float(r[-1]) if n > 0 else float("nan"),
+        "mean_overall": mean_overall,
+        "std_overall": std_overall,
+        "min": float(np.min(r)) if n > 0 else float("nan"),
+        "max": float(np.max(r)) if n > 0 else float("nan"),
+        "cumulative_reward": float(np.sum(r)) if n > 0 else float("nan"),
+        "cv_overall": cv_overall,
+    }
+
+    return metrics
+
+metrics_list = [compute_metrics(r) for r in reward_lists]
+rows = []
+for name, m in zip(alg_names, metrics_list):
+    row = {"algorithm": name}
+    row.update(m)
+    rows.append(row)
+
+df_metrics = pd.DataFrame(rows)
+cols = ["algorithm", "episodes", "final_reward", "mean_overall", "std_overall", "min", "max", "cumulative_reward", "cv_overall"]
+df_metrics = df_metrics[cols]
+
+print("Metrics table:")
+print(df_metrics.to_string(index=False))
+
+# Save table to CSV for report
+df_metrics.to_csv(f"plots/metrics_table_{VERSION}.csv", index=False) ; print(f"Saved metrics to: plots/metrics_table_{VERSION}.csv")
+
 def plot_comparison(alg_names, reward_lists, save_path="plots/comparison_metrics.png"):
     import matplotlib.pyplot as plt
 
@@ -99,7 +140,7 @@ def plot_comparison(alg_names, reward_lists, save_path="plots/comparison_metrics
     axs[2].set_ylabel('Variance (log scale)')
     axs[2].set_xticks(x)
     axs[2].set_xticklabels(alg_names, rotation=45, ha='right')
-    axs[2].set_yscale("log")
+    axs[2].set_yscale("log") #Comment this line to use linear scale
 
     for ax in axs:
         ax.grid(axis='y', linestyle='--', alpha=0.4)
@@ -140,8 +181,8 @@ def plot_episodic_line(alg_names, reward_lists, save_path="plots/episodic_reward
     if logscale:
         all_positive = all((series > 0).all() for _, series, _ in processed)
         yscale = 'log' if all_positive else 'symlog'
-    # else:
-    #     yscale = 'linear'
+    else:
+        yscale = 'linear'
 
     for name, r, color in processed:
         episodes = np.arange(1, len(r) + 1)
@@ -174,3 +215,4 @@ def plot_episodic_line(alg_names, reward_lists, save_path="plots/episodic_reward
 
 # default: episodic (non-cumulative, linear)
 plot_episodic_line(alg_names, reward_lists, logscale=True)
+plot_episodic_line(alg_names, reward_lists, cumulative=True)
