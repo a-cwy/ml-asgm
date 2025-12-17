@@ -10,8 +10,7 @@ import utils
 
 a2c = np.load("models/a2c/a2c_1_episode_rewards_breakdown.npy")
 rulebased = np.load("models/rulebased_1_episode_rewards_breakdown.npy")
-
-print(a2c.shape, rulebased.shape)
+dqn = np.load("models/dqn/dqn_v5-0-0-0_episode_rewards_breakdown.npy")
 
 #skip the first row which is all zeros
 a2c_energy = a2c[1:,2].flatten()
@@ -20,8 +19,14 @@ a2c_energy = np.cumsum(a2c_energy)
 rulebased_energy = rulebased[1:,2].flatten()
 rulebased_energy = np.cumsum(rulebased_energy)
 
+dqn_energy = dqn[1:,2].flatten()
+dqn_energy = np.cumsum(dqn_energy)
+
+print(a2c.shape, rulebased.shape, dqn.shape)
+
 plt.plot(rulebased_energy, 'r--', label = 'Rule-based') # Energy
 plt.plot(a2c_energy, 'y-', label = 'A2C') # Energy
+plt.plot(dqn_energy, 'b-', label = 'DQN') # Energy
 # a2c_comfort = a2c[:,0].flatten()
 # plt.plot(a2c_comfort, 'g-', label = 'Comfort') # Comfort
 plt.xlabel("Step")
