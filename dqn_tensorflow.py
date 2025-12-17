@@ -138,5 +138,4 @@ class DQNAgent():
             obs = next_obs
             rewards_breakdown.append(list(info["rewards"].values()))
 
-        print(utils.format_rewards(np.sum(rewards_breakdown, axis = 0)))
-        utils.plot_breakdown_cumulative(rewards_breakdown)
+        return rewards_breakdown
