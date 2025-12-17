@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 rewards_ppo = np.load("models/ppo/ppo_rewards.npy")
-rewards_a2c = np.load("models/a2c/a2c-v3-e500-rewards.npy")
+rewards_a2c = np.load("models/a2c/a2c-v4-e100-rewards.npy")
 rewards_sac = [
     -2759.0, -2734.2, -2734.0, -2734.9, -2765.8, -2691.0, -2687.2, -2825.9, -2758.2, -2687.6,
     -2739.4, -2691.1, -2758.0, -2705.7, -2797.3, -2705.5, -2719.4, -2683.0, -2683.0, -2781.9,

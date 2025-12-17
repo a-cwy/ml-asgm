@@ -50,10 +50,12 @@ for e in range(EPISODES):
 
 # Utility function to print a breakdown of the rewards.
 reward_breakdown = np.divide(reward_breakdown, EPISODES)
+print(f"Final Reward Breakdown after {EPISODES} episodes:")
 print(utils.format_rewards(reward_breakdown))
 # print("Reward list:", reward_list)
-utils.plot_rewards(reward_list)
+utils.plot_rewards(reward_list, "models/rulebased_rewards.png")
 np.save("rulebased_rewards.npy", np.array(reward_list))
 
 # print("Reward breakdown per episode:", rewards_breakdown_per_episode)
 utils.plot_breakdown_cumulative(np.array(rewards_breakdown_per_episode))
+np.save("rulebased_1_episode_rewards_breakdown.npy", np.array(rewards_breakdown_per_episode))

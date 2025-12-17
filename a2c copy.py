@@ -394,4 +394,4 @@ if __name__ == "__main__":
         
         agent.save_models(ACTOR_DIR, CRITIC_DIR)
         #Plot rewards
-        utils.plot_rewards(rewards)
+        utils.plot_rewards(rewards,f"plots/a2c-{VERSION_NUM}.png")

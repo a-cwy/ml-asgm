@@ -50,5 +50,6 @@ def plot_rewards(rewards_per_episode, path):
     plt.ylabel("Total Reward")
     plt.title("Total Reward per Episode")
     plt.grid()
-    plt.savefig(path)
+    plt.savefig(path, dpi=200)
+    plt.show()
     plt.close()

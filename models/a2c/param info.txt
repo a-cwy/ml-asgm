@@ -22,7 +22,7 @@
             value_loss_coef: float = 0.5,
             max_grad_norm: float = 0.5
 
-  v3-500
+//         v3-500
            env: gym.Env,
             actor_model: nn.Module = None,
             critic_model: nn.Module = None,
@@ -30,6 +30,39 @@
             learning_rate: float = 3e-4,
             gamma: float = 0.99,
             n_steps: int = 50,
+            entropy_coef: float = 0.01,
+            value_loss_coef: float = 0.5,
+            max_grad_norm: float = 0.5
+
+//         v4-100
+            env: gym.Env,
+            actor_model: nn.Module = None,
+            critic_model: nn.Module = None,
+            learning_rate: float = 3e-4,  #test with 1e-4, 3e-4, 5e-4
+            gamma: float = 0.99,
+            n_steps: int = 20,  #test with 20, 150, 100
+            entropy_coef: float = 0.01,
+            value_loss_coef: float = 0.5,
+            max_grad_norm: float = 0.5
+
+//         v5-100
+            env: gym.Env,
+            actor_model: nn.Module = None,
+            critic_model: nn.Module = None,
+            learning_rate: float = 3e-4,  #test with 1e-4, 3e-4, 5e-4
+            gamma: float = 0.99,
+            n_steps: int = 150,  #test with 20, 150, 100
+            entropy_coef: float = 0.01,
+            value_loss_coef: float = 0.5,
+            max_grad_norm: float = 0.5
+
+//         v6-100
+            env: gym.Env,
+            actor_model: nn.Module = None,
+            critic_model: nn.Module = None,
+            learning_rate: float = 3e-4,  #test with 1e-4, 3e-4, 5e-4
+            gamma: float = 0.99,
+            n_steps: int = 100,  #test with 20, 150, 100
             entropy_coef: float = 0.01,
             value_loss_coef: float = 0.5,
             max_grad_norm: float = 0.5

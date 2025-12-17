@@ -49,9 +49,9 @@ class A2CAgent():
             env: gym.Env,
             actor_model: nn.Module = None,
             critic_model: nn.Module = None,
-            learning_rate: float = 1e-4,  #test with 1e-4, 3e-4, 5e-4
+            learning_rate: float = 3e-4,  #test with 1e-4, 3e-4, 5e-4
             gamma: float = 0.99,
-            n_steps: int = 50,
+            n_steps: int = 100,  #test with 20, 150, 100
             entropy_coef: float = 0.01,
             value_loss_coef: float = 0.5,
             max_grad_norm: float = 0.5
@@ -93,14 +93,14 @@ class A2CAgent():
             vec = np.array(obs, dtype=np.float32).flatten()
         return vec
 
-    def choose_action(self, state_vec):
-        """Sample an action from the actor given a flattened state vector."""
-        state = torch.tensor(state_vec, dtype=torch.float32, device=self.device).unsqueeze(0)
-        with torch.no_grad():
-            probs = self.actor_model(state)
-        dist = Categorical(probs)
-        action = dist.sample()
-        return action.item(), dist.log_prob(action), dist.entropy()
+    # def choose_action(self, state_vec):
+    #     """Sample an action from the actor given a flattened state vector."""
+    #     state = torch.tensor(state_vec, dtype=torch.float32, device=self.device).unsqueeze(0)
+    #     with torch.no_grad():
+    #         probs = self.actor_model(state)
+    #     dist = Categorical(probs)
+    #     action = dist.sample()
+    #     return action.item(), dist.log_prob(action), dist.entropy()
 
     def act(self):
         """Run one episode using the current policy."""
@@ -125,6 +125,10 @@ class A2CAgent():
             #     break
         print(f"ACT: Episode rewards breakdown {utils.format_rewards(np.sum(rewards_breakdown, axis=0))}")
         utils.plot_breakdown_cumulative(rewards_breakdown)
+        
+        np.save("./models/a2c/a2c_1_episode_rewards_breakdown.npy", rewards_breakdown)
+        print("Saved results to a2c_1_episode_rewards_breakdown.npy")
+
     def save_models(self, actor_path, critic_path):
         """
         Save actor and critic state_dicts to the given paths. Also saves an
@@ -355,14 +359,14 @@ now = datetime.now()
 version = now.strftime("%Y%m%d_%H%M%S") if USE_DATESTAMP else "v4"  #CHANGE THIS TO DESIRED VERSION STRING
 
 VERSION_NUM = f"{version}"
-episodes = 500  #CHANGE THIS TO DESIRED NUMBER OF EPISODES
+episodes = 100  #CHANGE THIS TO DESIRED NUMBER OF EPISODES
 
 # Define model save paths
-ACTOR_DIR = f"./models/a2c/a2c-v3-e500-actor.pth"
-CRITIC_DIR = f"./models/a2c/a2c-v3-e500-critic.pth"
+# ACTOR_DIR = f"./models/a2c/a2c-v3-e500-actor.pth"
+# CRITIC_DIR = f"./models/a2c/a2c-v3-e500-critic.pth"
 
-# ACTOR_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{episodes}-actor.pth"
-# CRITIC_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{episodes}-critic.pth"
+ACTOR_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{episodes}-actor.pth"
+CRITIC_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{episodes}-critic.pth"
 
 if __name__ == "__main__":
     utils.init()
@@ -390,4 +394,4 @@ if __name__ == "__main__":
         
         agent.save_models(ACTOR_DIR, CRITIC_DIR)
         #Plot rewards
-        utils.plot_rewards(rewards)
+        utils.plot_rewards(rewards,f"./models/a2c/a2c-{VERSION_NUM}.png")
