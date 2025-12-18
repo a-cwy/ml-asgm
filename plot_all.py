@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 rewards_rulebased = np.load("models/rulebased_rewards.npy")
 rewards_ppo = np.load("models/ppo/ppo_act_100_rewards.npy")
 rewards_a2c = np.load("models/a2c/a2c_act100_total_rewards.npy")
-rewards_sac = np.load("models/sac/sac_act_100_rewards.npy")
+rewards_sac = np.load("models/sac/new_sac_act_100_rewards.npy")
 rewards_dqn = [1048.309117729268, 1069.5026737583723, 1048.4517957213461, 1045.1537590423807, 936.5585172348857, 1059.5782669659077, 935.7592384355157, 1058.9103801163906, 935.1753712722582, 953.8739630154133, 932.8458162373181, 933.3430721550471, 1061.793842397295, 1031.0737131902658, 1046.0178865213454, 912.9244045774146, 960.5409293446482, 944.5169216905992, 1045.864845331248, 1069.1155458495336, 1064.3340194190837, 984.7504184760563, 1059.0033365161835, 965.9267200111822, 1032.4666642148488, 1067.5829893581765, 1036.1908623539887, 1060.5260430810517, 989.967596410525, 1027.1484758403258, 1058.2826729333992, 964.7959256028282, 995.8982007826423, 859.4792688166358, 978.7717133366386, 985.1540525668643, 961.7732568574702, 948.910449049906, 1070.5902417760917, 996.1722966933021, 1067.310318543259, 997.2504223353833, 1063.4375834392026, 951.4783538162411, 1043.801400660975, 1047.8041027954882, 1050.0716706400779, 1061.0095775788368, 1065.5119396175705, 989.5010221069944, 959.7574154870041, 927.3205011227878, 1060.4078402765854, 1067.1121461065816, 922.9327010647459, 1065.8477143554014, 983.4521041631646, 1030.6229856361451, 1035.3422715636052, 962.9829747429824, 1027.6121784441928, 952.5443330394389, 1050.7757515922654, 959.7503709844952, 915.9488276544404, 1066.0145190713945, 1056.6618038826477, 921.85843460079, 961.4564152118644, 1031.7146663650765, 959.186712278045, 1059.9325759213684, 928.6741942500038, 1052.3583227241413, 934.870040082888, 966.9816806336692, 1049.4340249374661, 1070.1417709288212, 1068.7304387326324, 944.5920860646308, 997.9253792596041, 988.6810989944843, 935.216399937951, 912.7127437136264, 1065.4309612583234, 1058.4786736271524, 972.114503551018, 933.8915369617293, 972.6770515153546, 1068.9428306430211, 981.7287299330659, 917.8189735540859, 908.9349553264358, 920.7866156161895, 990.1941942713624, 980.7409544968231, 1043.3269687561724, 1029.776316100874, 1036.2231716647805, 959.3463735813067]
 
 
@@ -93,21 +93,27 @@ def plot_comparison(alg_names, reward_lists, save_path="plots/comparison_metrics
 
     # 1 . average
     # Create brokenaxes for first subplot using GridSpec (there should be 2 axes)
-    bax1 = brokenaxes(
-        ylims=((-35000, -33000), (-1500, 1500)), 
-        subplot_spec=gs[0],
-        fig=fig,
-        despine=False  
-    )
+    # bax1 = brokenaxes(
+    #     ylims=((-35000, -33000), (-1500, 1500)), 
+    #     subplot_spec=gs[0],
+    #     fig=fig,
+    #     despine=False  
+    # )
+    # bax1.bar(x, avgs, width, color=colors)
+    # bax1.set_title('Average Episodic Reward', pad=10)
+    # bax1.set_xticks(x)
+    # bax1.set_xticklabels(alg_names, rotation=45, ha='right')
+    # for ax in bax1.axs:
+    #     ax.grid(axis='y', linestyle='--', alpha=0.4)
+    #     ax.set_xticks(x)  
+    #     ax.set_xticklabels(alg_names, rotation=45, ha='right')
 
-    bax1.bar(x, avgs, width, color=colors)
-    bax1.set_title('Average Episodic Reward', pad=10)
-    bax1.set_xticks(x)
-    bax1.set_xticklabels(alg_names, rotation=45, ha='right')
-    for ax in bax1.axs:
-        ax.grid(axis='y', linestyle='--', alpha=0.4)
-        ax.set_xticks(x)  
-        ax.set_xticklabels(alg_names, rotation=45, ha='right')
+    ax1 = fig.add_subplot(gs[0])
+    ax1.bar(x, avgs, width, color=colors)
+    ax1.set_title('Average Episodic Reward', pad=10)
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(alg_names, rotation=45, ha='right')
+    ax1.grid(axis='y', linestyle='--', alpha=0.4)
 
     # # 2 . cumulative
     # bax2 = brokenaxes(
@@ -182,6 +188,8 @@ def plot_episodic_line(alg_names, reward_lists, save_path="plots/episodic_reward
 
     for name, r, color in processed:
         episodes = np.arange(1, len(r) + 1)
+        # if(name == "SAC"):
+        #     continue
         plt.plot(episodes, r, label=name, color=color, linewidth=1.5)
 
     plt.xlabel('Episode')
