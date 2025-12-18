@@ -1,5 +1,6 @@
 import utils
 import gymnasium as gym
+import numpy as np
 from dqn_tensorflow import DQNAgent
 from exploration import EpsilonGreedy, ThompsonSampling
 
@@ -100,9 +101,27 @@ agent = DQNAgent(
 
 if LOAD_PRETRAINED:
     agent.load_models(POLICY_DIR, TARGET_DIR)
-    tuned = agent.act()
+    rewards = []
 
-    utils.plot_breakdown_cumulative(tuned)
+    for e in range(EPISODES_NUM):
+        print(f"Episode: {e + 1}")
+        rewards.append(np.sum(agent.act()))
+
+    sum = np.sum(rewards)
+    mean = np.mean(rewards)
+    sd = np.std(rewards)
+    var = np.var(rewards)
+
+    print(f"\n")
+    print(f"100 Episodes:")
+    print(f"Summed Episodic Reward: {sum:.4f}")
+    print(f"Average Episodic Reward: {mean:.4f}")
+    print(f"Standard Deviation: {sd:.4f}")
+    print(f"Variance: {var:.4f}")
+    print(f"\n")
+
+    print(rewards)
+    
 else:
     rewards = agent.train(EPISODES_NUM)
     print(rewards)
