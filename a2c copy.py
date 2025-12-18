@@ -1,7 +1,6 @@
-## FOR BACKUP PURPOSES ONLY
+# FOR BACKUP AND TESTING PURPOSES ONLY
 
 import sys
-import gymnasium as gym
 import gymnasium as gym
 import torch
 import torch.nn as nn
@@ -52,16 +51,14 @@ class A2CAgent():
             env: gym.Env,
             actor_model: nn.Module = None,
             critic_model: nn.Module = None,
-            discount_factor: float = 0.99,
-            learning_rate: float = 1e-4,  #test with 1e-4, 3e-4, 5e-4
+            learning_rate: float = 3e-4,  #test with 1e-4, 3e-4, 5e-4
             gamma: float = 0.99,
-            n_steps: int = 50,
+            n_steps: int = 100,  #test with 20, 150, 100
             entropy_coef: float = 0.01,
             value_loss_coef: float = 0.5,
             max_grad_norm: float = 0.5
         ):
         self.env = env
-        self.discount_factor = discount_factor
         self.learning_rate = learning_rate
         self.gamma = gamma
         self.n_steps = n_steps
@@ -98,36 +95,47 @@ class A2CAgent():
             vec = np.array(obs, dtype=np.float32).flatten()
         return vec
 
-    def choose_action(self, state_vec):
-        """Sample an action from the actor given a flattened state vector."""
-        state = torch.tensor(state_vec, dtype=torch.float32, device=self.device).unsqueeze(0)
-        with torch.no_grad():
-            probs = self.actor_model(state)
-        dist = Categorical(probs)
-        action = dist.sample()
-        return action.item(), dist.log_prob(action), dist.entropy()
+    # def choose_action(self, state_vec):
+    #     """Sample an action from the actor given a flattened state vector."""
+    #     state = torch.tensor(state_vec, dtype=torch.float32, device=self.device).unsqueeze(0)
+    #     with torch.no_grad():
+    #         probs = self.actor_model(state)
+    #     dist = Categorical(probs)
+    #     action = dist.sample()
+    #     return action.item(), dist.log_prob(action), dist.entropy()
 
-    def act(self):
-        """Run one episode using the current policy (deterministic argmax)."""
-        #breakdown rewards
-        obs, _ = self.env.reset()
-        state = self._flatten_obs(obs)
-        terminated = False
-        truncated = False
-        total_reward = 0.0
-        while (not terminated and not truncated):
-            state_t = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
-            with torch.no_grad():
-                probs = self.actor_model(state_t)
-                action = probs.argmax(dim=-1).item()
+    def act(self, episodes: int = 100):
+        """Run `episodes` episodes using the current policy and collect total rewards."""
+        total_rewards = []
 
-            next_obs, reward, terminated, truncated, info = self.env.step(action)
-            total_reward += reward
-            state = self._flatten_obs(next_obs)
-            rewards_breakdown = np.add(np.zeros(len(info["rewards"])), list(info["rewards"].values()))
-            # if terminated or truncated:
-            #     break
-        print(f"ACT: Episode rewards breakdown {utils.format_rewards(rewards_breakdown)}")
+        for ep in range(episodes):
+            rewards_breakdown = [[0.0, 0.0, 0.0, 0.0]]
+            obs, _ = self.env.reset()
+            state = self._flatten_obs(obs)
+            terminated = False
+            truncated = False
+            total_reward = 0.0
+
+            while not (terminated or truncated):
+                state_t = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+                with torch.no_grad():
+                    probs = self.actor_model(state_t)
+                    action = probs.argmax(dim=-1).item()
+
+                next_obs, reward, terminated, truncated, info = self.env.step(action)
+                total_reward += reward
+                state = self._flatten_obs(next_obs)
+                rewards_breakdown.append(list(info.get("rewards", {}).values()))
+
+            print(f"ACT ep {ep+1}/{episodes}: Episode rewards breakdown {utils.format_rewards(np.sum(rewards_breakdown, axis=0))}")
+            # utils.plot_breakdown_cumulative(rewards_breakdown)
+
+            total_rewards.append(total_reward)
+
+        # save totals for all episodes
+        utils.plot_rewards(total_rewards, f"./models/a2c/a2c_act{episodes}_total_rewards.png")
+        np.save(f"./models/a2c/a2c_act{episodes}_total_rewards.npy", np.array(total_rewards))
+        print(f"Saved total rewards for {episodes} episodes to ./models/a2c/a2c_act{episodes}_total_rewards.npy")
 
     def save_models(self, actor_path, critic_path):
         """
@@ -348,7 +356,7 @@ class A2CAgent():
 
 #### TRAINING CONFIG
 from datetime import datetime
-LOAD_PRETRAINED = False
+LOAD_PRETRAINED = True
 USE_DATESTAMP = False
 
 # Get the current date and time
@@ -359,11 +367,11 @@ now = datetime.now()
 version = now.strftime("%Y%m%d_%H%M%S") if USE_DATESTAMP else "v4"  #CHANGE THIS TO DESIRED VERSION STRING
 
 VERSION_NUM = f"{version}"
-episodes = 500  #CHANGE THIS TO DESIRED NUMBER OF EPISODES
+episodes = 100  #CHANGE THIS TO DESIRED NUMBER OF EPISODES
 
 # Define model save paths
-# ACTOR_DIR = f"./models/a2c/a2c-20251204_234342-e200-actor.pth"
-# CRITIC_DIR = f"./models/a2c/a2c-20251204_234342-e200-critic.pth"
+# ACTOR_DIR = f"./models/a2c/a2c-v3-e500-actor.pth"
+# CRITIC_DIR = f"./models/a2c/a2c-v3-e500-critic.pth"
 
 ACTOR_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{episodes}-actor.pth"
 CRITIC_DIR = f"./models/a2c/a2c-{VERSION_NUM}-e{episodes}-critic.pth"
@@ -383,7 +391,7 @@ if __name__ == "__main__":
     #ENSURE directory EXISTS
     if LOAD_PRETRAINED and os.path.exists(ACTOR_DIR) and os.path.exists(CRITIC_DIR):
         agent.load_models(ACTOR_DIR, CRITIC_DIR)
-        agent.act()
+        agent.act(episodes=episodes)
     else:
         rewards = agent.train(episodes, actor_path=ACTOR_DIR, critic_path=CRITIC_DIR)
         print(f"Rewards for {episodes} episodes: {rewards}")
@@ -394,4 +402,4 @@ if __name__ == "__main__":
         
         agent.save_models(ACTOR_DIR, CRITIC_DIR)
         #Plot rewards
-        utils.plot_rewards(rewards,f"plots/a2c-{VERSION_NUM}.png")
+        utils.plot_rewards(rewards,f"./models/a2c/a2c-{VERSION_NUM}.png")

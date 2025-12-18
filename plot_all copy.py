@@ -1,3 +1,6 @@
+#backup copy
+
+
 """
 To compare different RL algorithms (PPO, A2C, SAC, DQN) based on their ACT episodic rewards
 """
@@ -79,8 +82,7 @@ print(df_metrics.to_string(index=False))
 df_metrics.to_csv(f"plots/metrics_table_{VERSION}.csv", index=False) ; print(f"Saved metrics to: plots/metrics_table_{VERSION}.csv")
 
 def plot_comparison(alg_names, reward_lists, save_path="plots/comparison_metrics.png"):
-    from brokenaxes import brokenaxes
-    from matplotlib.gridspec import GridSpec
+    import matplotlib.pyplot as plt
 
     # compute metrics
     avgs = np.array([np.mean(r) for r in reward_lists])
@@ -90,72 +92,41 @@ def plot_comparison(alg_names, reward_lists, save_path="plots/comparison_metrics
     x = np.arange(len(alg_names))
     width = 0.6
 
-    # Create figure and GridSpec with adjusted spacing
-    fig = plt.figure(figsize=(14, 5))
-    gs = GridSpec(1, 2, figure=fig, wspace=0.35)  # Increase horizontal spacing
-    fig.suptitle('RL Model Comparison Metrics (Evaluated over 100 episodes)', y=0.98)
+    fig, axs = plt.subplots(1, 3, figsize=(14, 5))
+    plt.suptitle('RL Model Comparison Metrics (Evaluated over 100 episodes)')
 
     # get a colormap and generate distinct colors for each algorithm
     cmap = clrmap
     colors = cmap(np.linspace(0, 1, len(alg_names)))
 
-    # 1 . average
-    # Create brokenaxes for first subplot using GridSpec (there should be 2 axes)
-    bax1 = brokenaxes(
-        ylims=((-35000, -33000), (-1500, 1500)), 
-        subplot_spec=gs[0],
-        fig=fig,
-        despine=False  
-    )
+    axs[0].bar(x, avgs, width, color=colors)
+    axs[0].set_title('Average Episodic Reward')
+    axs[0].set_xticks(x)
+    axs[0].set_xticklabels(alg_names, rotation=45, ha='right')
 
-    bax1.bar(x, avgs, width, color=colors)
-    bax1.set_title('Average Episodic Reward', pad=10)
-    bax1.set_xticks(x)
-    bax1.set_xticklabels(alg_names, rotation=45, ha='right')
-    for ax in bax1.axs:
+    axs[1].bar(x, cums, width, color=colors)
+    axs[1].set_title('Cumulative Reward')
+    # axs[1].set_yscale('symlog')  
+    axs[1].set_xticks(x)
+    axs[1].set_xticklabels(alg_names, rotation=45, ha='right')
+
+    axs[2].bar(x, variance, width, color=colors)
+    axs[2].set_title('Learning Instability (Variance)')
+    axs[2].set_ylabel('Variance (log scale)')
+    axs[2].set_xticks(x)
+    axs[2].set_xticklabels(alg_names, rotation=45, ha='right')
+    axs[2].set_yscale("log") #Comment this line to use linear scale
+
+    for ax in axs:
         ax.grid(axis='y', linestyle='--', alpha=0.4)
-        ax.set_xticks(x)  
-        ax.set_xticklabels(alg_names, rotation=45, ha='right')
 
-    # # 2 . cumulative
-    # bax2 = brokenaxes(
-    #     ylims=((-3.5e6, -3.3e6), (-1.5e5, 1.2e5)), 
-    #     subplot_spec=gs[1],
-    #     fig=fig,
-    #     despine=False 
-    # )
-    # ax2 = fig.add_subplot(gs[1])
-    # ax2.bar(x, cums, width, color=colors)
-    # ax2.set_xticks(x)
-    # ax2.set_xticklabels(alg_names, rotation=45, ha='right')
-    # ax2.grid(axis='y', linestyle='--', alpha=0.4)
-    # bax2.bar(x, cums, width, color=colors)
-    # bax2.set_title('Cumulative Reward', pad=10)
-    # bax2.set_xticks(x)  
-    # bax2.set_xticklabels(alg_names, rotation=45, ha='right')
-    # for ax in bax2.axs:
-    #     ax.grid(axis='y', linestyle='--', alpha=0.4)
-    #     ax.set_xticks(x)  
-    #     ax.set_xticklabels(alg_names, rotation=45, ha='right')
-    #     if ax == bax2.axs[1]:
-    #         ax.set_yticks([-3.5e6, -3.4e6, -3.3e6,], labels=['-3500000', '-3400000', '-3300000', ])
-    
-    ax3 = fig.add_subplot(gs[1])
-    ax3.bar(x, variance, width, color=colors)
-    ax3.set_title('Learning Instability (Variance)', pad=10)
-    ax3.set_ylabel('Variance (log scale)')
-    ax3.set_xticks(x)
-    ax3.set_xticklabels(alg_names, rotation=45, ha='right')
-    ax3.set_yscale("log")
-    ax3.grid(axis='y', linestyle='--', alpha=0.4)
-
+    # print(type(avgs))
     print(f"Average: {avgs}, \n Cumulative: {cums},\n Variance: {variance}")
-    
-    # Adjust layout with custom parameters
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
-    fig.savefig(save_path, dpi=200, bbox_inches='tight')
+    plt.tight_layout()
+    fig.savefig(save_path, dpi=200)
     print(f"Saved comparison plot to: {save_path}")
     plt.show()
+
 
 # Prepare and plot using available reward arrays
 
