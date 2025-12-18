@@ -8,12 +8,14 @@ from torch.distributions.categorical import Categorical
 import numpy as np
 
 class CriticNetwork(nn.Module):
-    def __init__(self, beta, input_dims, n_actions, fc1_dims=256, fc2_dims=256,
+    def __init__(self, beta, input_dims, n_actions, fc1_dims=256, fc2_dims=256, fc3_dims=256, fc4_dims=256,
             name='critic', chkpt_dir='tmp/sac'):
         super(CriticNetwork, self).__init__()
         self.input_dims = input_dims
         self.fc1_dims = fc1_dims
         self.fc2_dims = fc2_dims
+        self.fc3_dims = fc3_dims
+        self.fc4_dims = fc4_dims
         self.n_actions = n_actions
         self.name = name
         self.checkpoint_dir = chkpt_dir
@@ -21,8 +23,10 @@ class CriticNetwork(nn.Module):
 
         # critic takes state and action (for discrete action we will pass one-hot)
         self.fc1 = nn.Linear(self.input_dims[0] + n_actions, self.fc1_dims)
-        self.fc2 = nn.Linear(self.fc1_dims, self.fc2_dims)
-        self.q = nn.Linear(self.fc2_dims, 1)
+        self.fc2 = nn.Linear(self.fc1_dims, self.fc2_dims)        
+        self.fc3 = nn.Linear(self.fc2_dims, self.fc3_dims)
+        self.fc4 = nn.Linear(self.fc3_dims, self.fc4_dims)
+        self.q = nn.Linear(self.fc4_dims, 1)
 
         self.optimizer = optim.AdamW(self.parameters(), lr=beta, weight_decay=1e-5)
         self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
@@ -32,6 +36,10 @@ class CriticNetwork(nn.Module):
         action_value = self.fc1(T.cat([state, action], dim=1))
         action_value = F.relu(action_value)
         action_value = self.fc2(action_value)
+        action_value = F.relu(action_value)
+        action_value = self.fc3(action_value)
+        action_value = F.relu(action_value)
+        action_value = self.fc4(action_value)
         action_value = F.relu(action_value)
         q = self.q(action_value)
         return q
@@ -45,19 +53,22 @@ class CriticNetwork(nn.Module):
 
 
 class ValueNetwork(nn.Module):
-    def __init__(self, beta, input_dims, fc1_dims=256, fc2_dims=256,
-            name='value', chkpt_dir='tmp/sac'):
+    def __init__(self, beta, input_dims, fc1_dims=256, fc2_dims=256, fc3_dims=256, fc4_dims=256, name='value', chkpt_dir='tmp/sac'):
         super(ValueNetwork, self).__init__()
         self.input_dims = input_dims
         self.fc1_dims = fc1_dims
         self.fc2_dims = fc2_dims
+        self.fc3_dims = fc3_dims
+        self.fc4_dims = fc4_dims
         self.name = name
         self.checkpoint_dir = chkpt_dir
         self.checkpoint_file = os.path.join(self.checkpoint_dir, name + '_sac.pth')
 
         self.fc1 = nn.Linear(*self.input_dims, self.fc1_dims)
         self.fc2 = nn.Linear(self.fc1_dims, fc2_dims)
-        self.v = nn.Linear(self.fc2_dims, 1)
+        self.fc3 = nn.Linear(self.fc2_dims, fc3_dims)
+        self.fc4 = nn.Linear(self.fc3_dims, fc4_dims)
+        self.v = nn.Linear(self.fc4_dims, 1)
 
         self.optimizer = optim.AdamW(self.parameters(), lr=beta, weight_decay=1e-5)
         self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
@@ -67,6 +78,10 @@ class ValueNetwork(nn.Module):
         state_value = self.fc1(state)
         state_value = F.relu(state_value)
         state_value = self.fc2(state_value)
+        state_value = F.relu(state_value)
+        state_value = self.fc3(state_value)
+        state_value = F.relu(state_value)
+        state_value = self.fc4(state_value)
         state_value = F.relu(state_value)
         v = self.v(state_value)
         return v
@@ -80,12 +95,13 @@ class ValueNetwork(nn.Module):
 
 
 class ActorNetwork(nn.Module):
-    def __init__(self, alpha, input_dims, max_action, fc1_dims=256, 
-            fc2_dims=256, n_actions=2, name='actor', chkpt_dir='tmp/sac'):
+    def __init__(self, alpha, input_dims, max_action, fc1_dims=256, fc2_dims=256, fc3_dims=256, fc4_dims=256, n_actions=2, name='actor', chkpt_dir='tmp/sac'):
         super(ActorNetwork, self).__init__()
         self.input_dims = input_dims
         self.fc1_dims = fc1_dims
         self.fc2_dims = fc2_dims
+        self.fc3_dims = fc3_dims
+        self.fc4_dims = fc4_dims
         self.n_actions = n_actions
         self.name = name
         self.checkpoint_dir = chkpt_dir
@@ -95,12 +111,14 @@ class ActorNetwork(nn.Module):
 
         self.fc1 = nn.Linear(*self.input_dims, self.fc1_dims)
         self.fc2 = nn.Linear(self.fc1_dims, self.fc2_dims)
+        self.fc3 = nn.Linear(self.fc2_dims, self.fc3_dims)
+        self.fc4 = nn.Linear(self.fc3_dims, self.fc4_dims)
 
         # outputs
         # For continuous: mu and sigma
         # For discrete: logits (use mu as logits)
-        self.mu = nn.Linear(self.fc2_dims, self.n_actions)
-        self.sigma = nn.Linear(self.fc2_dims, self.n_actions)
+        self.mu = nn.Linear(self.fc4_dims, self.n_actions)
+        self.sigma = nn.Linear(self.fc4_dims, self.n_actions)
 
         self.optimizer = optim.AdamW(self.parameters(), lr=alpha, weight_decay=1e-5)
         self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
@@ -110,6 +128,10 @@ class ActorNetwork(nn.Module):
         prob = self.fc1(state)
         prob = F.relu(prob)
         prob = self.fc2(prob)
+        prob = F.relu(prob)
+        prob = self.fc3(prob)
+        prob = F.relu(prob)
+        prob = self.fc4(prob)
         prob = F.relu(prob)
         mu = self.mu(prob)
         sigma = self.sigma(prob)
