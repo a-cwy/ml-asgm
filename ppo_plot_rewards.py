@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# .npy stores the rewards collected during PPO training
 rewards = np.load("ppo_rewards.npy")
 
 window = 20
